@@ -49,19 +49,6 @@ def add_scan_to_database(items: dict):
     items["_id"] = value["count"]
     mongo.Vio.Items.insert_one(items)
 
-# if __name__ == "__main__":
-#     from PIL import Image
-#     import numpy as np
-#     tab = TableExtraction()
-#     # starscraper = ItemScraper(tab)
-#     print(tab.extract_table("merged_image.png"))
-
-#     # original = np.array(Image.open("test0.png"))
-#     # buys = np.array(Image.open("test1.png"))
-#     # sells = np.array(Image.open("test2.png"))
-#     # img = Image.fromarray(starscraper.merge_screenshot(original, sells, buys))
-#     # img.save("merged_image.png")
-
 if __name__ == "__main__":
     while True:
         try:

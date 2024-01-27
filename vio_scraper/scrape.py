@@ -101,7 +101,6 @@ class ItemScraper:
         self.click_at_location_name("search")
         time.sleep(1)
         pydirectinput.write(name, interval=0.1)
-        pydirectinput.press("enter")
         time.sleep(1)
 
     def openTopItemInList(self):
