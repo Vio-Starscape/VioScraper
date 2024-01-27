@@ -1,12 +1,15 @@
 import time
+import cv2
 import logging
 import pydirectinput
 import pyautogui
-import tablecv
 import os
 import json
 import numpy as np
-from datetime import datetime
+import multiprocessing
+from PIL import ImageGrab, Image, ImageDraw
+from .extraction import TableExtraction
+from datetime import datetime, timezone
 
 logger = logging.getLogger("LucaScraper")
 
@@ -22,266 +25,279 @@ class ItemNotFound(Exception):
 ############################
 # Config                   #
 ############################
-max_rows = 8
-table_scale = 2 # Upscale for orders
-row_height = 17
 
-def scrape(items: list, location: str = "c1"):
-    current_iter = {
-        "location": location,
-        "time_scanned": datetime.now().timestamp(),
-        "items": {}
-    }
-    for item in items:
-        logger.debug("Scraping item: " + item)
-        focusItemInList(item)
-        if validate_item_exists(0):
-            current_iter["items"][item] = scanList()
-        else:
-            raise ItemNotFound(f"{item} not found")
-    return current_iter
-
-def scrape_single(item: str):
-    focusItemInList(item)
-    if validate_item_exists(0):
-        return scanList()
-    else:
-        raise ItemNotFound(f"{item} not found")
-        
-def scanList():
-    offset = 0
-    row_count = 0
-    if validate_item_exists(0):
-        openXItemInList(0)
-        waitForItemLoad("sell")
-        payload = scanItem()
-        closeItem()
-        if payload != {}:
-            return payload
-        row_count += 1
-        offset += row_height
-    else:
-        raise ItemNotFound("Item not found")
-
-def openXItemInList(x):
-    click_at_location_name_with_offet("first_row", x * row_height)
-    click_at_location_name("open_item")
-
-
-def validate_item_exists(offset):
-    coords = coordinates["first_row"]
-    xy = [int(coords[0]), int(coords[1])]
-    xy[1] += offset
-    return validate_consistent_color_at_coords(xy, 40)
-
-def focusItemInList(name):
-    click_at_location_name("search")
-    pydirectinput.click()
-    time.sleep(0.5)
-    pydirectinput.write(name)
-
-def openTopItemInList():
-    click_at_location_name("first_row")
-    click_at_location_name("open_item")
-
-def closeItem():
-    click_at_location_name("close_item")
-
-def scanItem():
-    data = list(
-        tablecv.extract_table(
-            take_screenshot_of_region("item")
-        ).itertuples(index=False, name=None)
-    )
-    name = data[0][0]
-    volume = data[3][2]
-
-    sells, buys = extract_listings(data)
-
-    clean_input = lambda x: x.replace(",", "").replace(" ", "").replace("/", "7")
-
-    if get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
-        print("extra sells")
-        sells = extract_extra_listings(sells, "sell")
-    if get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
-        print("extra buys")
-        buys = extract_extra_listings(buys, "buy")
-
-    print("Before sort")
-    print(sells)
-    print(buys)
-
-    sells = sorted(
-        [
-            (float(clean_input(x[0])) if x[0] != "" else 6, int(clean_input(x[1])), int(clean_input(x[2]))) 
-            for x in sells if x[2] != "Station"
-        ], 
-        key=lambda x: x[0]
+def worker_init(path: str | None):
+    global table
+    table = TableExtraction(
+        rec_model_dir=path,
     )
 
-    buys = sorted(
-        [
-            (float(clean_input(x[0])) if x[0] != "" else 6, int(clean_input(x[1])), int(clean_input(x[2]))) 
-            for x in buys if x[2] != "Station"
-        ], 
-        key=lambda x: x[0],
-        reverse=True
-    )
+def worker(data):
+    return table.extract_table(data)
+
+class ItemScraper:
+
+    max_rows = 8
+    table_scale = 2 # Upscale for orders
+    row_height = 17
+
+    def __init__(self, model_path: str = None) -> None:
+        self.model_path = model_path
+
+    def better_scrape(self, items: list, location: str = "c1"):
+        current_iter = {
+            "location": location,
+            "time_scanned": datetime.now(timezone.utc),
+            "items": {}
+        }
+        cpus = multiprocessing.cpu_count()
+        with multiprocessing.Pool(min(cpus, len(items)), initializer=worker_init, initargs=(self.model_path,)) as p:
+            images = []
+            for item in items:
+                logger.debug("Scraping item: " + item)
+                self.focusItemInList(item)
+                if self.validate_item_exists(0):
+                    x = 0
+                    while not (ImageGrab.grab().getpixel(tuple(coordinates["item_x"])) == (240,240,240)):
+                        self.openXItemInList(0)
+                        x += 1
+                        if x > 10:
+                            raise ItemNotFound(f"{item} not found")
+                    self.waitForItemLoad()
+                    item_scan = self.improvedScanItem()
+                    self.closeItem()
+                    images.append(
+                        {
+                            "name": item,
+                            "image" : item_scan
+                        }
+                    )
+                else:
+                    raise ItemNotFound(f"{item} not found")
+            
+            groups = [images[i:i + cpus] for i in range(0, len(images), cpus)]
+            for group in groups:
+                    results = p.map(worker, group)
+                    for result in results:
+                        data = self.scanItem(result["data"])
+                        current_iter["items"][result["name"]] = data
+            current_iter["end_time_scanned"] = datetime.now(timezone.utc)
+        return current_iter
+
+    def openXItemInList(self, x):
+        self.click_at_location_name_with_offet("first_row", x * self.row_height)
+        self.click_at_location_name("open_item")
+
+
+    def validate_item_exists(self, offset):
+        coords = tuple(coordinates["first_row"])
+        return ImageGrab.grab().getpixel(coords) != (30,30,30)
+
+    def focusItemInList(self, name):
+        self.click_at_location_name("search")
+        pydirectinput.click()
+        time.sleep(0.5)
+        pydirectinput.write(name)
+
+    def openTopItemInList(self):
+        self.click_at_location_name("first_row")
+        self.click_at_location_name("open_item")
+
+    def closeItem(self):
+        self.click_at_location_name("close_item")
+
+    def merge_screenshot(self, original: np.array, sells: np.array = None, buys: np.array = None) -> np.ndarray:
+        if buys is not None:
+            split_point = coordinates["buy"][3] - coordinates["item"][1]
+            top = original[:split_point, :]
+            bottom = original[split_point:, :]
+            original = np.concatenate((top, buys, bottom), axis=0)
+        if sells is not None:
+            split_point = coordinates["sell"][3] - coordinates["item"][1]
+            top = original[:split_point, :]
+            bottom = original[split_point:, :]
+            original = np.concatenate((top, sells, bottom), axis=0)
+
+        height = original.shape[0]
+        original_pil = Image.fromarray(original)
+        draw = ImageDraw.Draw(original_pil)
+        height = original_pil.height
+        for x in [76, 210]:
+            draw.line([(x, 0), (x, height)], fill=(0, 0, 0), width=5)
+
+        original = np.array(original_pil)
+
+        return original
+
+    def improvedScanItem(self) -> np.ndarray:
+        inital_screenshot = self.take_screenshot_of_region("item")
+        sell_screenshot, buy_screenshot = None, None
+        if self.get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
+            while self.get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
+                self.click_at_location_name("sell_wheel")
+                pydirectinput.dragRel(None, 180, 0.5, button="left")
+            sell_screenshot = self.take_screenshot_of_region("sell")
+        if self.get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
+            while self.get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
+                self.click_at_location_name("buy_wheel")
+                pydirectinput.dragRel(None, 180, 0.5, button="left")
+            buy_screenshot = self.take_screenshot_of_region("buy")
+        final_screenshot = self.merge_screenshot(
+            inital_screenshot, 
+            sell_screenshot, 
+            buy_screenshot
+        )
+        return final_screenshot
     
-
-    if sells == [] and buys == []:
-        logger.debug("An order could not be processed")
-        return {}
-    payload = {
-        "name": name,
-        "volume": volume, 
-        "buy": buys,
-        "sell":  sells,
-    }
-    logger.debug(payload)
-    return payload
-
-def emergency_rescan(reigon: str):
-    if reigon == "buy":
-        return list(
-                tablecv.extract_table(
-                    take_screenshot_of_region("sell")
-                ).itertuples(index=False, name=None)
-        )
-    else:
-        return list(
-                tablecv.extract_table(
-                    take_screenshot_of_region("buy")
-                ).itertuples(index=False, name=None)
-        )
-
-def extract_extra_listings(data: list[tuple[str, str, str]], table: str):
-    if table == "buy":
-        while get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
-            click_at_location_name("buy_wheel")
-            pydirectinput.dragRel(None, 180, 0.5, button="left")
-        added_data = list(
-            tablecv.extract_table(
-                take_screenshot_of_region("sell")
-            ).itertuples(index=False, name=None)
-        )
-        return list(set(data + added_data))
-    else:
-        while get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
-            click_at_location_name("sell_wheel")
-            pydirectinput.dragRel(None, 180, 0.5, button="left")
-        added_data = list(
-            tablecv.extract_table(
-                take_screenshot_of_region("buy")
-            ).itertuples(index=False, name=None)
-        )
-        return list(set(data + added_data))
-
-def extract_listings(data: list[tuple[str, str, str]]):
-    listings = data[5:]
-    sells, buys = [], []
-    buy_flag = False
-    for listing in listings:
-        if listing[2] == "Station":
-            continue
-        if listing[2].isdigit():
-            if buy_flag:
-                buys.append(listing)
+    def extract_listings(self, data: list[tuple[str, str, str]]):
+        listings = data[5:]
+        sells, buys = [], []
+        buy_flag = False
+        for listing in listings:
+            if listing[2] == "Station":
+                continue
+            if listing[2].isdigit():
+                if buy_flag:
+                    buys.append(listing)
+                else:
+                    sells.append(listing)
             else:
-                sells.append(listing)
-        else:
-            buy_flag = True
-    return sells, buys
+                buy_flag = True
+        return sells, buys
 
-def jiggle():
-    pydirectinput.move(0, 1)
-    pydirectinput.move(0, -1)
+    def scanItem(self, data):
+        print(data)
+        name = data[0][0]
+        volume = data[3][2]
 
-def click_at(x, y):
-    pydirectinput.moveTo(x, y)
-    jiggle()
-    pydirectinput.click()
-    jiggle()
-    pydirectinput.click()
+        sells, buys = self.extract_listings(data)
 
-def click_once_at(x, y):
-    pydirectinput.moveTo(x, y)
-    jiggle()
-    pydirectinput.click()
+        def clean_input(x: str, n: list[tuple[str, str, str]], index: int = 2):
+            if x == "":
+                if index == 0:
+                    max_price = max([float(x[0]) for x in n if x[0] != ""])
+                    if max_price < 6:
+                        return 4
+                    else:
+                        return 6
+                elif index == 1:
+                    return 1
+            return x.replace(",", "").replace(" ", "").replace("/", "7").replace("A", "4")
+        
+        sells = sorted(
+            list(set([
+                (float(clean_input(x[0], sells, 0)), int(clean_input(x[1], sells, 1)), int(clean_input(x[2], sells))) 
+                for x in sells if x[2] != "Station"
+            ])), 
+            key=lambda x: x[0]
+        )
 
-def click_at_location_name(name):
-    x_y = coordinates[name]
-    x = x_y[0]
-    y = x_y[1]
-    click_once_at(x, y)
+        buys = sorted(
+            list(set([
+                (float(clean_input(x[0], buys, 0)), int(clean_input(x[1], buys, 1)), int(clean_input(x[2], buys))) 
+                for x in buys if x[2] != "Station"
+            ])), 
+            key=lambda x: x[0],
+            reverse=True
+        )
 
-def click_at_location_name_with_offet(name, offset):
-    x_y = coordinates[name]
-    x = x_y[0]
-    y = x_y[1] + offset
-    click_once_at(x, y)
+        payload = {
+            "name": name,
+            "volume": volume, 
+            "buy": buys,
+            "sell":  sells,
+        }
+        logger.debug(payload)
+        return payload
 
-def take_screenshot_of_region(region):
-    region_bounds = coordinates[region]
-    usable_bounds = raw_region_to_usable_region(region_bounds)
-    return take_photo_with_predefined_coords(usable_bounds)
+    def jiggle(self):
+        pydirectinput.move(0, 1)
+        pydirectinput.move(0, -1)
 
-def take_photo_with_predefined_coords(coords):
-    img = pyautogui.screenshot(region=coords)
-    np_array = np.array(img)
-    return np_array
+    def click_at(self, x, y):
+        pydirectinput.moveTo(x, y)
+        self.jiggle()
+        pydirectinput.click()
+        self.jiggle()
+        pydirectinput.click()
 
-def raw_region_to_usable_region(old):
-    diff_x = old[2] - old[0]
-    diff_y = old[3] - old[1]
-    return([old[0], old[1], diff_x, diff_y])
+    def click_once_at(self, x, y):
+        pydirectinput.moveTo(x, y)
+        self.jiggle()
+        pydirectinput.click()
 
-def waitForItemLoad(type):
-    counter = 0
-    count = 0
-    time.sleep(0.001)
-    while counter < 30:
-        if count > 5: 
-            return True
-        if type == "sell":
-            if validate_color_at_coords(coordinates["first_sell_row"], 32): count += 1
-        else:
-            if validate_color_at_coords(coordinates["first_buy_row"], 32): count += 1
-        counter += 1
-        time.sleep(0.1)
+    def click_at_location_name(self, name):
+        x_y = coordinates[name]
+        x = x_y[0]
+        y = x_y[1]
+        self.click_once_at(x, y)
 
-def validate_color_at_coords(coordinates, brightness):
-    pixel = get_color_at_pixel(coordinates)
-    if pixel[0] > brightness or pixel[1] > brightness or pixel[2] > brightness:
-        return True
-    else:
+    def click_at_location_name_with_offet(self, name, offset):
+        x_y = coordinates[name]
+        x = x_y[0]
+        y = x_y[1] + offset
+        self.click_once_at(x, y)
+
+    def take_screenshot_of_region(self, region):
+        region_bounds = coordinates[region]
+        usable_bounds = self.raw_region_to_usable_region(region_bounds)
+        return self.take_photo_with_predefined_coords(usable_bounds)
+
+    def take_photo_with_predefined_coords(self, coords):
+        img = pyautogui.screenshot(region=coords)
+        np_array = np.array(img)
+        return np_array
+
+    def raw_region_to_usable_region(self, old):
+        diff_x = old[2] - old[0]
+        diff_y = old[3] - old[1]
+        return([old[0], old[1], diff_x, diff_y])
+
+    def waitForItemLoad(self):
+        counter = 0
+        count = 0
+        time.sleep(0.001)
+        while counter < 30:
+            if count > 5: 
+                return True
+            if type == "sell":
+                if self.validate_color_at_coords(coordinates["first_sell_row"], 32): count += 1
+            else:
+                if self.validate_color_at_coords(coordinates["first_buy_row"], 32): count += 1
+            counter += 1
+            time.sleep(0.1)
         return False
 
-def get_color_at_pixel(coordinates):
-    try:
-        pixel = pyautogui.pixel(coordinates[0], coordinates[1])
-    except: 
-        pixel = pyautogui.pixel(coordinates[0], coordinates[1])
-    return pixel
-
-def validate_consistent_color_at_coords(coordinates, brightness, min = 8):
-    counter = 0
-    hits = 0
-    last_pixel = get_color_at_pixel(coordinates)
-    while counter < 30:
-        logger.debug(last_pixel)
-        current_pixel = get_color_at_pixel(coordinates)
-        if last_pixel != current_pixel: 
-            hits = 0
-            last_pixel = current_pixel
-        if hits > min:
-            logger.debug("exists")
+    def validate_color_at_coords(self, coordinates, brightness):
+        pixel = self.get_color_at_pixel(coordinates)
+        if pixel[0] > brightness or pixel[1] > brightness or pixel[2] > brightness:
             return True
-        if(validate_color_at_coords(coordinates, brightness)): hits += 1
-        elif hits > 0: hits += -1
-        counter += 1
-    logger.debug("not open")
-    return False
+        else:
+            return False
 
-if __name__ == "__main__":
-    print(extract_extra_listings([], "buy"))
+    def get_color_at_pixel(self, coordinates):
+        try:
+            pixel = pyautogui.pixel(coordinates[0], coordinates[1])
+        except: 
+            pixel = pyautogui.pixel(coordinates[0], coordinates[1])
+        return pixel
+
+    def validate_consistent_color_at_coords(self, coordinates, brightness, min = 8):
+        counter = 0
+        hits = 0
+        last_pixel = self.get_color_at_pixel(coordinates)
+        while counter < 30:
+            logger.debug(last_pixel)
+            current_pixel = self.get_color_at_pixel(coordinates)
+            if last_pixel != current_pixel: 
+                hits = 0
+                last_pixel = current_pixel
+            if hits > min:
+                logger.debug("exists")
+                return True
+            if(self.validate_color_at_coords(coordinates, brightness)): hits += 1
+            elif hits > 0: hits += -1
+            counter += 1
+        logger.debug("not open")
+        return False
+    
