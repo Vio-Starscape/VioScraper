@@ -1,10 +1,7 @@
 import time
-import cv2
 import logging
 import pydirectinput
 import pyautogui
-import os
-import json
 import numpy as np
 import multiprocessing
 from PIL import ImageGrab, Image, ImageDraw
@@ -12,12 +9,6 @@ from .extraction import TableExtraction
 from datetime import datetime, timezone
 
 logger = logging.getLogger("LucaScraper")
-
-#import data from config1080p.json
-dir_path = os.path.dirname(os.path.realpath(__file__))
-dir_path = os.path.join(dir_path, "config1080p.json")
-with open(dir_path) as f:
-    coordinates = json.load(f)
 
 class ItemNotFound(Exception):
     pass
@@ -41,7 +32,8 @@ class ItemScraper:
     table_scale = 2 # Upscale for orders
     row_height = 17
 
-    def __init__(self, model_path: str = None) -> None:
+    def __init__(self, config: dict, model_path: str = None) -> None:
+        self.config = config
         self.model_path = model_path
 
     def better_scrape(self, items: list, location: str = "c1"):
@@ -61,7 +53,7 @@ class ItemScraper:
 
                     if self.validate_item_exists():
                         x = 0
-                        while not (ImageGrab.grab().getpixel(tuple(coordinates["item_x"])) == (240,240,240)):
+                        while not (ImageGrab.grab().getpixel(tuple(self.config["item_x"])) == (240,240,240)):
                             self.openXItemInList(0)
                             x += 1
                             if x > 10:
@@ -94,7 +86,7 @@ class ItemScraper:
 
 
     def validate_item_exists(self):
-        coords = tuple(coordinates["first_row"])
+        coords = tuple(self.config["first_row"])
         return ImageGrab.grab().getpixel(coords) != (30,30,30)
 
     def focusItemInList(self, name):
@@ -112,12 +104,12 @@ class ItemScraper:
 
     def merge_screenshot(self, original: np.array, sells: np.array = None, buys: np.array = None) -> np.ndarray:
         if buys is not None:
-            split_point = coordinates["buy"][3] - coordinates["item"][1]
+            split_point = self.config["buy"][3] - self.config["item"][1]
             top = original[:split_point, :]
             bottom = original[split_point:, :]
             original = np.concatenate((top, buys, bottom), axis=0)
         if sells is not None:
-            split_point = coordinates["sell"][3] - coordinates["item"][1]
+            split_point = self.config["sell"][3] - self.config["item"][1]
             top = original[:split_point, :]
             bottom = original[split_point:, :]
             original = np.concatenate((top, sells, bottom), axis=0)
@@ -136,13 +128,13 @@ class ItemScraper:
     def improvedScanItem(self) -> np.ndarray:
         inital_screenshot = self.take_screenshot_of_region("item")
         sell_screenshot, buy_screenshot = None, None
-        if self.get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
-            while self.get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
+        if self.get_color_at_pixel(self.config["sell_wheel"]) == (143, 143, 143):
+            while self.get_color_at_pixel(self.config["sell_wheel"]) == (143, 143, 143):
                 self.click_at_location_name("sell_wheel")
                 pydirectinput.dragRel(None, 180, 0.5, button="left")
             sell_screenshot = self.take_screenshot_of_region("sell")
-        if self.get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
-            while self.get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
+        if self.get_color_at_pixel(self.config["buy_wheel"]) == (143, 143, 143):
+            while self.get_color_at_pixel(self.config["buy_wheel"]) == (143, 143, 143):
                 self.click_at_location_name("buy_wheel")
                 pydirectinput.dragRel(None, 180, 0.5, button="left")
             buy_screenshot = self.take_screenshot_of_region("buy")
@@ -231,16 +223,16 @@ class ItemScraper:
         pydirectinput.click()
 
     def click_at_location_name(self, name):
-        self.click_once_at(*coordinates[name])
+        self.click_once_at(*self.config[name])
 
     def click_at_location_name_with_offet(self, name, offset):
-        x_y = coordinates[name]
+        x_y = self.config[name]
         x = x_y[0]
         y = x_y[1] + offset
         self.click_once_at(x, y)
 
     def take_screenshot_of_region(self, region):
-        region_bounds = coordinates[region]
+        region_bounds = self.config[region]
         usable_bounds = self.raw_region_to_usable_region(region_bounds)
         return self.take_photo_with_predefined_coords(usable_bounds)
 
@@ -262,9 +254,9 @@ class ItemScraper:
             if count > 5: 
                 return True
             if type == "sell":
-                if self.validate_color_at_coords(coordinates["first_sell_row"], 32): count += 1
+                if self.validate_color_at_coords(self.config["first_sell_row"], 32): count += 1
             else:
-                if self.validate_color_at_coords(coordinates["first_buy_row"], 32): count += 1
+                if self.validate_color_at_coords(self.config["first_buy_row"], 32): count += 1
             counter += 1
             time.sleep(0.1)
         return False

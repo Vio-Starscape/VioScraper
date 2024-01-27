@@ -39,10 +39,11 @@ class ProcessManager:
         def wait_for(func, *args):
             while not func(*args):
                 pass
-        pydirectinput.moveTo(*self.config["search"])
+        pydirectinput.moveTo(*self.config["rob_search"])
+        print(pydirectinput.position())
         wait_for(
             lambda x, y: ImageGrab.grab().getpixel((x, y)) == tuple(self.config["search_color"]), 
-            *self.config["search"]
+            *self.config["rob_search"]
         )
         self.jiggle_mouse()
         pydirectinput.doubleClick()
@@ -52,7 +53,7 @@ class ProcessManager:
         pydirectinput.press("enter")
         wait_for(
             lambda x, y: ImageGrab.grab().getpixel((x, y)) == tuple(self.config["search_color"]), 
-            *self.config["search"]
+            *self.config["rob_search"]
         )
         pydirectinput.moveTo(*self.config["play_button"])
         self.jiggle_mouse()
