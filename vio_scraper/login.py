@@ -72,6 +72,7 @@ class ProcessManager:
         )
         time.sleep(2)
         pydirectinput.press("f")
+        time.sleep(5)
         
 
 

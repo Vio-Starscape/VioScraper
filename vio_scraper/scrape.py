@@ -55,32 +55,36 @@ class ItemScraper:
             images = []
             for item in items:
                 logger.debug("Scraping item: " + item)
-                self.focusItemInList(item)
-                if self.validate_item_exists(0):
-                    x = 0
-                    while not (ImageGrab.grab().getpixel(tuple(coordinates["item_x"])) == (240,240,240)):
-                        self.openXItemInList(0)
-                        x += 1
-                        if x > 10:
-                            raise ItemNotFound(f"{item} not found")
-                    self.waitForItemLoad()
-                    item_scan = self.improvedScanItem()
-                    self.closeItem()
-                    images.append(
-                        {
-                            "name": item,
-                            "image" : item_scan
-                        }
-                    )
-                else:
-                    raise ItemNotFound(f"{item} not found")
+                while True:
+                    self.focusItemInList(item)
+                    time.sleep(0.5)
+
+                    if self.validate_item_exists():
+                        x = 0
+                        while not (ImageGrab.grab().getpixel(tuple(coordinates["item_x"])) == (240,240,240)):
+                            self.openXItemInList(0)
+                            x += 1
+                            if x > 10:
+                                raise ItemNotFound(f"{item} not found")
+                        self.waitForItemLoad()
+                        item_scan = self.improvedScanItem()
+                        self.closeItem()
+                        images.append(
+                            {
+                                "name": item,
+                                "image" : item_scan
+                            }
+                        )
+                        break
+                    else:
+                        continue
             
             groups = [images[i:i + cpus] for i in range(0, len(images), cpus)]
             for group in groups:
-                    results = p.map(worker, group)
-                    for result in results:
-                        data = self.scanItem(result["data"])
-                        current_iter["items"][result["name"]] = data
+                results = p.map(worker, group)
+                for result in results:
+                    data = self.scanItem(result["data"])
+                    current_iter["items"][result["name"]] = data
             current_iter["end_time_scanned"] = datetime.now(timezone.utc)
         return current_iter
 
@@ -89,15 +93,16 @@ class ItemScraper:
         self.click_at_location_name("open_item")
 
 
-    def validate_item_exists(self, offset):
+    def validate_item_exists(self):
         coords = tuple(coordinates["first_row"])
         return ImageGrab.grab().getpixel(coords) != (30,30,30)
 
     def focusItemInList(self, name):
         self.click_at_location_name("search")
-        pydirectinput.click()
-        time.sleep(0.5)
-        pydirectinput.write(name)
+        time.sleep(1)
+        pydirectinput.write(name, interval=0.1)
+        pydirectinput.press("enter")
+        time.sleep(1)
 
     def openTopItemInList(self):
         self.click_at_location_name("first_row")
@@ -227,10 +232,7 @@ class ItemScraper:
         pydirectinput.click()
 
     def click_at_location_name(self, name):
-        x_y = coordinates[name]
-        x = x_y[0]
-        y = x_y[1]
-        self.click_once_at(x, y)
+        self.click_once_at(*coordinates[name])
 
     def click_at_location_name_with_offet(self, name, offset):
         x_y = coordinates[name]

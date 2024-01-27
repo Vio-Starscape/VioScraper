@@ -4,8 +4,7 @@ import logging
 import time
 from dotenv import load_dotenv
 from pprint import pprint
-from typing import List, Dict, Tuple
-from vio_scraper import ProcessManager, ItemScraper, ItemNotFound, TableExtraction
+from vio_scraper import ProcessManager, ItemScraper
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.CRITICAL + 1)
@@ -64,34 +63,27 @@ def add_scan_to_database(items: dict):
 #     # img.save("merged_image.png")
 
 if __name__ == "__main__":
-    starscraper = ItemScraper()
-    start = time.perf_counter()
-    resp = starscraper.better_scrape(item_list)
-    print(resp)
-    add_scan_to_database(resp)
-    end = time.perf_counter()
-    print("Time taken: ", end - start)
-    # while True:
-    #     try:
-    #         broken = False
-    #         with ProcessManager(os.getenv("ROBLOX_GAME_PATH"), config) as process:
-    #             starscraper = ItemScraper()
-    #             while True:
-    #                 try:
-    #                     start = time.perf_counter()
-    #                     resp = starscraper.better_scrape(item_list)
-    #                     print(resp)
-    #                     add_scan_to_database(resp)
-    #                     end = time.perf_counter()
-    #                     print("Time taken: ", end - start)
-    #                 except KeyboardInterrupt:
-    #                     broken = True
-    #                     break
-    #         if broken:
-    #             break
-    #     except KeyboardInterrupt:
-    #         break
-    #     except Exception as e:
-    #         print(e)
+    while True:
+        try:
+            broken = False
+            with ProcessManager(os.getenv("ROBLOX_GAME_PATH"), config) as process:
+                starscraper = ItemScraper()
+                while True:
+                    try:
+                        start = time.perf_counter()
+                        resp = starscraper.better_scrape(item_list)
+                        print(resp)
+                        add_scan_to_database(resp)
+                        end = time.perf_counter()
+                        print("Time taken: ", end - start)
+                    except KeyboardInterrupt:
+                        broken = True
+                        break
+            if broken:
+                break
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(e)
 
 
