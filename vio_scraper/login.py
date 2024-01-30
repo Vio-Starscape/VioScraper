@@ -40,7 +40,6 @@ class ProcessManager:
             while not func(*args):
                 pass
         pydirectinput.moveTo(*self.config["rob_search"])
-        print(pydirectinput.position())
         wait_for(
             lambda x, y: ImageGrab.grab().getpixel((x, y)) == tuple(self.config["search_color"]), 
             *self.config["rob_search"]

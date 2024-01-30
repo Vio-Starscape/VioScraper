@@ -76,8 +76,7 @@ class ItemScraper:
             for group in groups:
                 results = p.map(worker, group)
                 for result in results:
-                    data = self.scanItem(result["data"])
-                    current_iter["items"][result["name"]] = data
+                    current_iter["items"][result["name"]] = result["data"]
             current_iter["end_time_scanned"] = datetime.now(timezone.utc)
         return current_iter
 
@@ -85,16 +84,13 @@ class ItemScraper:
         self.click_at_location_name_with_offet("first_row", x * self.row_height)
         self.click_at_location_name("open_item")
 
-
     def validate_item_exists(self):
         coords = tuple(self.config["first_row"])
         return ImageGrab.grab().getpixel(coords) != (30,30,30)
 
     def focusItemInList(self, name):
         self.click_at_location_name("search")
-        time.sleep(1)
         pydirectinput.write(name, interval=0.1)
-        time.sleep(1)
 
     def openTopItemInList(self):
         self.click_at_location_name("first_row")
@@ -123,12 +119,12 @@ class ItemScraper:
             while self.get_color_at_pixel(self.config["sell_wheel"]) == (143, 143, 143):
                 self.click_at_location_name("sell_wheel")
                 pydirectinput.dragRel(None, 180, 0.5, button="left")
-            sell_screenshot = self.take_screenshot_of_region("sell")
+            sell_screenshot = self.take_screenshot_of_region("sell_box")
         if self.get_color_at_pixel(self.config["buy_wheel"]) == (143, 143, 143):
             while self.get_color_at_pixel(self.config["buy_wheel"]) == (143, 143, 143):
                 self.click_at_location_name("buy_wheel")
                 pydirectinput.dragRel(None, 180, 0.5, button="left")
-            buy_screenshot = self.take_screenshot_of_region("buy")
+            buy_screenshot = self.take_screenshot_of_region("buy_box")
         final_screenshot = self.merge_screenshot(
             initial_screenshot, 
             sell_screenshot, 
@@ -151,51 +147,6 @@ class ItemScraper:
             else:
                 buy_flag = True
         return sells, buys
-
-    def scanItem(self, data):
-        print(data)
-        name = data[0][0]
-        volume = data[3][2]
-
-        sells, buys = self.extract_listings(data)
-
-        def clean_input(x: str, n: list[tuple[str, str, str]], index: int = 2):
-            if x == "":
-                if index == 0:
-                    max_price = max([float(x[0]) for x in n if x[0] != ""])
-                    if max_price < 6:
-                        return 4
-                    else:
-                        return 6
-                elif index == 1:
-                    return 1
-            return x.replace(",", "").replace(" ", "").replace("/", "7").replace("A", "4")
-        
-        sells = sorted(
-            list(set([
-                (float(clean_input(x[0], sells, 0)), int(clean_input(x[1], sells, 1)), int(clean_input(x[2], sells))) 
-                for x in sells if x[2] != "Station"
-            ])), 
-            key=lambda x: x[0]
-        )
-
-        buys = sorted(
-            list(set([
-                (float(clean_input(x[0], buys, 0)), int(clean_input(x[1], buys, 1)), int(clean_input(x[2], buys))) 
-                for x in buys if x[2] != "Station"
-            ])), 
-            key=lambda x: x[0],
-            reverse=True
-        )
-
-        payload = {
-            "name": name,
-            "volume": volume, 
-            "buy": buys,
-            "sell":  sells,
-        }
-        logger.debug(payload)
-        return payload
 
     def jiggle(self):
         pydirectinput.move(0, 1)

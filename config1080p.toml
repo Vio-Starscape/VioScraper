@@ -14,12 +14,30 @@ close_item = [ 1121, 254,]
 first_sell_row = [ 860, 370,]
 first_buy_row = [ 865, 600,]
 item = [ 793, 247, 1127, 802,]
-sell = [ 793, 368, 1127, 565,]
+sell_box = [ 793, 368, 1127, 565,]
 sell_wheel = [ 1112, 373,]
 buy_wheel = [ 1112, 603,]
 item_x = [ 1122, 254,]
-buy = [ 793, 600, 1127, 795,]
+buy_box = [ 793, 600, 1127, 795,]
 volume = [ 1008, 324, 1117, 341,]
 switch_to_sell = [ 707, 276,]
 switch_to_buy = [ 957, 276,]
 name = [ 793, 254, 1033, 269,]
+
+# OCR settings
+
+item_name = [ 2, 4, 200, 17,]
+
+[buy]
+price = [ 8, 350, 108, 550,]
+quantity = [ 118, 350, 208, 550,]
+vendor_id = [ 225, 350, 310, 550,]
+
+[sell]
+price = [ 8, 120, 108, 320,]
+quantity = [ 118, 120, 208, 320,]
+vendor_id = [ 225, 120, 310, 320,]
+
+# Multiple Items
+
+item_list = [728, 312, 1114, 827,]

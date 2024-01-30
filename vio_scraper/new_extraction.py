@@ -27,7 +27,7 @@ vendor_id = [ 225, 120, 310, 320,]
 
     def extract_data_from_image(self, img: Image, buys: bool = False, sells: bool = False):
         data = {
-            "title": self.get_title(img),
+            "name": self.get_title(img),
             "buy": self.get_buy(img, buys, sells),
             "sell": self.get_sell(img, sells),
         }
