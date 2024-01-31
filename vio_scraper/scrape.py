@@ -4,9 +4,9 @@ import pydirectinput
 import pyautogui
 import numpy as np
 import multiprocessing
+import re
 from PIL import ImageGrab, Image, ImageDraw
-# from .extraction import TableExtraction
-from .new_extraction import ImageProcessing
+from .extraction import ImageProcessing
 from datetime import datetime, timezone
 
 logger = logging.getLogger("LucaScraper")
@@ -29,11 +29,12 @@ class ItemScraper:
 
     max_rows = 8
     table_scale = 2 # Upscale for orders
-    row_height = 17
+    row_height = 37
 
     def __init__(self, config: dict, model_path: str = None) -> None:
         self.config = config
         self.model_path = model_path
+        self.processor = ImageProcessing()
 
     def better_scrape(self, items: list, location: str = "c1"):
         current_iter = {
@@ -46,31 +47,37 @@ class ItemScraper:
             images = []
             for item in items:
                 logger.debug("Scraping item: " + item)
-                while True:
-                    self.focusItemInList(item)
-                    time.sleep(0.5)
+                self.focusItemInList(item)
+                time.sleep(0.5)
 
-                    if self.validate_item_exists():
-                        x = 0
-                        while not (ImageGrab.grab().getpixel(tuple(self.config["item_x"])) == (240,240,240)):
-                            self.openXItemInList(0)
-                            x += 1
-                            if x > 10:
-                                raise ItemNotFound(f"{item} not found")
-                        self.waitForItemLoad()
-                        item_scan, extra_sells, extra_buys = self.improvedScanItem()
-                        self.closeItem()
-                        images.append(
-                            {
-                                "name": item,
-                                "extra_sell": extra_sells,
-                                "extra_buy": extra_buys,
-                                "image" : item_scan
-                            }
-                        )
-                        break
-                    else:
-                        continue
+                if self.validate_item_exists():
+                    x = 0
+                    depth = self.getItemDepth()
+                    location = 0
+                    if depth > 1:
+                        location = self.getSpecificItemDepth(item, depth)
+                    while not (ImageGrab.grab().getpixel(tuple(self.config["item_x"])) == (240,240,240)):
+                        self.openXItemInList(location)
+                        x += 1
+                        if x > 10:
+                            raise ItemNotFound(f"{item} not found")
+                    self.waitForItemLoad()
+                    item_scan, extra_sells, extra_buys = self.improvedScanItem()
+                    self.closeItem()
+                    images.append(
+                        {
+                            "name": item,
+                            "extra_sell": extra_sells,
+                            "extra_buy": extra_buys,
+                            "image" : item_scan
+                        }
+                    )
+                else:
+                    current_iter["items"][item] = {
+                        "name": item,
+                        "buy": [],
+                        "sell": []
+                    }
             
             groups = [images[i:i + cpus] for i in range(0, len(images), cpus)]
             for group in groups:
@@ -89,8 +96,10 @@ class ItemScraper:
         return ImageGrab.grab().getpixel(coords) != (30,30,30)
 
     def focusItemInList(self, name):
+        self.click_at_location_name("first_row")
         self.click_at_location_name("search")
-        pydirectinput.write(name, interval=0.1)
+        value = re.sub(r"[-(].*", "", name).strip()
+        pydirectinput.write(value, interval=0.1)
 
     def openTopItemInList(self):
         self.click_at_location_name("first_row")
@@ -99,14 +108,28 @@ class ItemScraper:
     def closeItem(self):
         self.click_at_location_name("close_item")
 
+    def getItemDepth(self):
+        for i, (x, y) in enumerate(self.config["item_list_location"], start=1):
+            if ImageGrab.grab().getpixel((x, y)) == (30,30,30):
+                return i-1
+        return len(self.config["item_list_location"])
+    
+    def getSpecificItemDepth(self, item: str, current_depth: int):
+        img = Image.fromarray(self.take_screenshot_of_region("item_list"))
+        for j in range(current_depth):
+            chosen_item = img.crop([n+(j*37) if i%2 == 1 else n for i, n in enumerate(self.config["item_list_name"])])
+            name = self.processor.get_item_name(chosen_item)
+            if name.lower() == item.lower():
+                return j
+
     def merge_screenshot(self, original: np.array, sells: np.array = None, buys: np.array = None) -> np.ndarray:
         if buys is not None:
-            split_point = self.config["buy"][3] - self.config["item"][1]
+            split_point = self.config["buy_box"][3] - self.config["item"][1]
             top = original[:split_point, :]
             bottom = original[split_point:, :]
             original = np.concatenate((top, buys, bottom), axis=0)
         if sells is not None:
-            split_point = self.config["sell"][3] - self.config["item"][1]
+            split_point = self.config["sell_box"][3] - self.config["item"][1]
             top = original[:split_point, :]
             bottom = original[split_point:, :]
             original = np.concatenate((top, sells, bottom), axis=0)

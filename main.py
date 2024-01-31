@@ -1,20 +1,22 @@
-import pymongo
 import os
 import logging
 import time
+import datetime
 import toml
+import requests
+import json
 from dotenv import load_dotenv
-from pprint import pprint
-from vio_scraper import ProcessManager, ItemScraper
+from vio_scraper import ProcessManager, ItemScraper, ItemNotFound
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.CRITICAL + 1)
+load_dotenv(override=True)
+
+logger = logging.getLogger("LucaScraper")
+logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
 form = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 console_handler.setFormatter(form)
-console_handler.setLevel(logging.CRITICAL + 1)
-
-load_dotenv()
+console_handler.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
 
 item_list = [
     "Korrelite",
@@ -24,24 +26,50 @@ item_list = [
     "Narcor",
     "Red Narcor",
     "Vexnium",
-    "Water"
+    "Water",
+    "Polaris",
+    "Adamant",
+    "Ancient Composite Armor",
+    "Ancient Coilgun-M",
+    "Adv. drone core",
+    "Ethereal (Barracuda)",
+    "Loxodon"
 ]
 
-mongo = pymongo.MongoClient(os.getenv("MONGO_URI"))
+cached = []
+
+def datetime_handler(x):
+    if isinstance(x, datetime.datetime):
+        return x.isoformat()
+    raise TypeError("Unknown type")
 
 def add_scan_to_database(items: dict):
-    pprint(items)
-    value = mongo.Vio.Items.find_one_and_update(
-        {"_id": 0},
-        {"$inc": {"count": 1}}
-    )
-    items["_id"] = value["count"]
-    mongo.Vio.Items.insert_one(items)
+    try:
+        print("Adding to database")
+        cached.append(items)
+        for item in cached:
+            res = requests.post(
+                os.getenv("URL"),
+                json=json.loads(json.dumps(item, default=datetime_handler))
+            )
+            print(res.status_code)
+            print(res.text)
+        cached.clear()
+    except Exception as e:
+        print(e)
 
-if __name__ == "__main__":
-    with open("config1080p.toml", "r") as f:
-        config = toml.load(f)
 
+def test_function(config: dict):
+    starscraper = ItemScraper(config)
+    start = time.perf_counter()
+    resp = starscraper.better_scrape(item_list)
+    print(resp)
+    # add_scan_to_database(resp)
+    end = time.perf_counter()
+    print("Time taken: ", end - start)
+
+
+def main(config: dict):
     while True:
         try:
             broken = False
@@ -58,6 +86,9 @@ if __name__ == "__main__":
                     except KeyboardInterrupt:
                         broken = True
                         break
+                    except ItemNotFound as e:
+                        print(e)
+                        break
             if broken:
                 break
         except KeyboardInterrupt:
@@ -65,4 +96,23 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
+if __name__ == "__main__":
+    with open("config1080p.toml", "r") as f:
+        config = toml.load(f)
 
+    # from PIL import Image
+    # from pyautogui import screenshot
+    # from vio_scraper import ImageProcessing
+
+    # # print(config)
+    # imgproc = ImageProcessing()
+    # t = ItemScraper(config)
+    # img = Image.fromarray(t.take_screenshot_of_region("item_list"))
+    # for j in range(t.getItemDepth()):
+    #     chosen_item = img.crop([n+(j*37) if i%2 == 1 else n for i, n in enumerate(config["item_list_name"])])
+    #     print(imgproc.get_item_name(chosen_item))
+    # # chosen_item.show()
+    # # print(imgproc.get_item_name(chosen_item))
+    
+
+    test_function(config)
