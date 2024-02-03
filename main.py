@@ -29,14 +29,19 @@ def add_scan_to_database(items: dict):
     try:
         print("Adding to database")
         cached.append(items)
+        bad = False
         for item in cached:
+            if len(item["items"]) < 30:
+                continue
             res = requests.post(
                 os.getenv("URL"),
                 json=json.loads(json.dumps(item, default=datetime_handler))
             )
-            print(res.status_code)
-            print(res.text)
-        cached.clear()
+            if res.status_code != 200:
+                bad = True
+                print(res.text)
+        if not bad:
+            cached.clear()
     except Exception as e:
         print(e)
 

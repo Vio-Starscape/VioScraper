@@ -5,6 +5,7 @@ import numpy as np
 import time
 import keyboard
 import multiprocessing
+import sys
 from queue import Queue
 from threading import Thread
 from concurrent.futures import ProcessPoolExecutor
@@ -44,7 +45,7 @@ class ItemScraper:
         time.sleep(1)
         grab = ImageGrab.grab()
         while (not keyboard.is_pressed("q"))\
-            and any([grab.getpixel((config["top_of_listing"][0], y)) == (255, 255, 255) for y in range(config["top_of_listing"][1], config["bottom_of_listing"][1])]):
+            and any([grab.getpixel((config["top_of_listing"][0], y)) == (255, 255, 255) for y in range(config["top_of_listing"][1], config["bottom_of_listing"][1]+20)]):
             time.sleep(0.1)
             pydirectinput.press("enter")
             time.sleep(0.1)
@@ -68,6 +69,8 @@ class ItemScraper:
             pydirectinput.press("down")
             time.sleep(0.1)
             grab = ImageGrab.grab()
+        if keyboard.is_pressed("q"):
+            sys.exit(0)
 
     def process_images(self, queue, executor, current_iter, cpus=8):
         images = []
@@ -110,13 +113,17 @@ class ItemScraper:
             grabber.join()
             queue.put(None)  # signal to processor that grabbing is done
             processor.join()
-        self.click_at_location_name("Armor")
-        self.click_at_location_name("All")
         pydirectinput.press("\\")
-        pydirectinput.press("\\")
-        pydirectinput.press("\\")
-        pydirectinput.press("\\")
-        pydirectinput.press("\\")
+        for _ in range(4):
+            time.sleep(0.1)
+            pydirectinput.press("\\")
+            time.sleep(0.1)
+            self.click_at_location_name("terminal_x")
+            time.sleep(0.1)
+            pydirectinput.press("f")
+            time.sleep(0.1)
+            pydirectinput.press("\\")
+            time.sleep(0.1)
         return current_iter
 
     def closeItem(self):
@@ -199,10 +206,14 @@ class ItemScraper:
         start = time.perf_counter()
         grab = ImageGrab.grab()
         clicked = False
+        clicked2= False
         while grab.getpixel(self.config["item_background"]) != (20, 20, 20):
             if time.perf_counter() - start > 1 and not clicked:
                 self.click_at_location_name("open_item") # This works really well for catching the item
                 clicked = True
+            if time.perf_counter() - start > 2 and not clicked2:
+                self.click_at_location_name("open_item") # This works really well for catching the item
+                clicked2 = True
             if time.perf_counter() - start > 5:
                 return False
             grab = ImageGrab.grab()

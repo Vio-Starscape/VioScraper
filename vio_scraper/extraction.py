@@ -63,7 +63,7 @@ vendor_id = [ 225, 120, 310, 320,]
     def get_title(self, img: Image):
         title = self.process_image(img, self.config["item_name"])
         text = self.text_striping(pytesseract.image_to_string(title, config="--psm 7 "))
-        return text.strip().replace("@", "0")
+        return text.strip().replace("@", "0").replace("[", "I").replace("]", "l")
     
     def get_buy(self, img: Image, buys: bool = False, sells: bool = False):
 
