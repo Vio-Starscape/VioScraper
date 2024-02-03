@@ -19,11 +19,15 @@ class ItemNotFound(Exception):
 
 def unknown_worker(data):
     img = ImageProcessing()
-    info = img.extract_data_from_image(data["image"], data["extra_buy"], data["extra_sell"])
-    return {
-        "name": info["name"],
-        "data": info
-    }
+    try:
+        info = img.extract_data_from_image(data["image"], data["extra_buy"], data["extra_sell"])
+        return {
+            "name": info["name"],
+            "data": info
+        }
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return None
 
 class ItemScraper:
 
@@ -37,16 +41,20 @@ class ItemScraper:
         self.processor = ImageProcessing()
 
     def grab_images(self, queue, config):
-        count = 0
-        while not keyboard.is_pressed("q"):
+        time.sleep(1)
+        grab = ImageGrab.grab()
+        while (not keyboard.is_pressed("q"))\
+            and any([grab.getpixel((config["top_of_listing"][0], y)) == (255, 255, 255) for y in range(config["top_of_listing"][1], config["bottom_of_listing"][1])]):
+            time.sleep(0.1)
             pydirectinput.press("enter")
+            time.sleep(0.1)
             self.click_at_location_name("open_item")
-            self.click_at_location_name("open_item")
+            # while ImageGrab.grab().getpixel(config["item_background"]) != (20, 20, 20) and not keyboard.is_pressed("q"):
+            time.sleep(0.1)
             if not self.waitForItemLoad():
                 break
             img, extra_sells, extra_buys = self.improvedScanItem()
-            Image.fromarray(img).save(f"unknown{count}.png")
-            count += 1
+            # Image.fromarray(img).save(f"unknown{count}.png")
             queue.put(
                 {
                     "name": "unknown",
@@ -56,7 +64,10 @@ class ItemScraper:
                 }
             )
             self.closeItem()
+            time.sleep(0.1)
             pydirectinput.press("down")
+            time.sleep(0.1)
+            grab = ImageGrab.grab()
 
     def process_images(self, queue, executor, current_iter, cpus=8):
         images = []
@@ -68,6 +79,8 @@ class ItemScraper:
             if len(images) == cpus:
                 results = list(executor.map(unknown_worker, images))
                 for result in results:
+                    if result is None:
+                        continue
                     if result["name"].endswith("tag"):
                         continue
                     if result["name"] not in current_iter["items"]:
@@ -184,15 +197,13 @@ class ItemScraper:
 
     def waitForItemLoad(self):
         start = time.perf_counter()
-        count = 0
-        while True:
-            grab = ImageGrab.grab()
-            val = grab.getpixel(self.config["first_sell_row"]) != (35, 35, 35)\
-                and grab.getpixel(self.config["first_buy_row"]) != (35, 35, 35)\
-                    and grab.getpixel(self.config["item_background"]) != (20, 20, 20)
-            if not val:
-                count += 1
-            if count > 5:
-                return True
+        grab = ImageGrab.grab()
+        clicked = False
+        while grab.getpixel(self.config["item_background"]) != (20, 20, 20):
+            if time.perf_counter() - start > 1 and not clicked:
+                self.click_at_location_name("open_item") # This works really well for catching the item
+                clicked = True
             if time.perf_counter() - start > 5:
                 return False
+            grab = ImageGrab.grab()
+        return True

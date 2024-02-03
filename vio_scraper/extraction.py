@@ -54,7 +54,7 @@ vendor_id = [ 225, 120, 310, 320,]
         return text
     
     def get_item_name(self, img: Image):
-        name = pytesseract.image_to_string(img, config="--psm 6")
+        name = pytesseract.image_to_string(img, config="--psm 7")
         name = self.text_striping(name)
         name = regex.sub(r"[^a-zA-Z\(\)-\s]", "", name)
         name = regex.sub(r"^-|-$", "", name)
@@ -63,7 +63,7 @@ vendor_id = [ 225, 120, 310, 320,]
     def get_title(self, img: Image):
         title = self.process_image(img, self.config["item_name"])
         text = self.text_striping(pytesseract.image_to_string(title, config="--psm 7 "))
-        return text.strip()
+        return text.strip().replace("@", "0")
     
     def get_buy(self, img: Image, buys: bool = False, sells: bool = False):
 
@@ -179,10 +179,3 @@ vendor_id = [ 225, 120, 310, 320,]
         ]), key=lambda x: x[0])
 
         return final
-
-if __name__ == "__main__":
-    image = Image.open()
-    processor = ImageProcessing(loaded_config)
-    img = processor.extract_data_from_image(image, True, False)
-    print(img)
-

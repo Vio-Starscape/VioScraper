@@ -45,7 +45,7 @@ def test_function(config: dict):
     start = time.perf_counter()
     resp = starscraper.new_complete_scrape()
     print(resp)
-    # add_scan_to_database(resp)
+    add_scan_to_database(resp)
     end = time.perf_counter()
     print("Time taken: ", end - start)
     return resp
@@ -80,6 +80,4 @@ if __name__ == "__main__":
     with open("config1080p.toml", "r") as f:
         config = toml.load(f)
 
-    time.sleep(3)
-    print(test_function(config))
-    # print(test_function(config))
+    main(config)
