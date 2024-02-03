@@ -18,24 +18,6 @@ console_handler.setFormatter(form)
 console_handler.setLevel(logging.DEBUG)
 logger.addHandler(console_handler)
 
-item_list = [
-    "Korrelite",
-    "Gellium",
-    "Axnit",
-    "Reknite",
-    "Narcor",
-    "Red Narcor",
-    "Vexnium",
-    "Water",
-    "Polaris",
-    "Adamant",
-    "Ancient Composite Armor",
-    "Ancient Coilgun-M",
-    "Adv. drone core",
-    "Ethereal (Barracuda)",
-    "Loxodon"
-]
-
 cached = []
 
 def datetime_handler(x):
@@ -58,16 +40,15 @@ def add_scan_to_database(items: dict):
     except Exception as e:
         print(e)
 
-
 def test_function(config: dict):
     starscraper = ItemScraper(config)
     start = time.perf_counter()
-    resp = starscraper.better_scrape(item_list)
+    resp = starscraper.new_complete_scrape()
     print(resp)
     # add_scan_to_database(resp)
     end = time.perf_counter()
     print("Time taken: ", end - start)
-
+    return resp
 
 def main(config: dict):
     while True:
@@ -78,9 +59,8 @@ def main(config: dict):
                 while True:
                     try:
                         start = time.perf_counter()
-                        resp = starscraper.better_scrape(item_list)
-                        print(resp)
-                        # add_scan_to_database(resp)
+                        resp = starscraper.new_complete_scrape()
+                        add_scan_to_database(resp)
                         end = time.perf_counter()
                         print("Time taken: ", end - start)
                     except KeyboardInterrupt:
@@ -100,19 +80,6 @@ if __name__ == "__main__":
     with open("config1080p.toml", "r") as f:
         config = toml.load(f)
 
-    # from PIL import Image
-    # from pyautogui import screenshot
-    # from vio_scraper import ImageProcessing
-
-    # # print(config)
-    # imgproc = ImageProcessing()
-    # t = ItemScraper(config)
-    # img = Image.fromarray(t.take_screenshot_of_region("item_list"))
-    # for j in range(t.getItemDepth()):
-    #     chosen_item = img.crop([n+(j*37) if i%2 == 1 else n for i, n in enumerate(config["item_list_name"])])
-    #     print(imgproc.get_item_name(chosen_item))
-    # # chosen_item.show()
-    # # print(imgproc.get_item_name(chosen_item))
-    
-
-    test_function(config)
+    time.sleep(3)
+    print(test_function(config))
+    # print(test_function(config))

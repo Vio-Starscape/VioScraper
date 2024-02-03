@@ -58,7 +58,7 @@ vendor_id = [ 225, 120, 310, 320,]
         name = self.text_striping(name)
         name = regex.sub(r"[^a-zA-Z\(\)-\s]", "", name)
         name = regex.sub(r"^-|-$", "", name)
-        return name
+        return name.strip()
     
     def get_title(self, img: Image):
         title = self.process_image(img, self.config["item_name"])
