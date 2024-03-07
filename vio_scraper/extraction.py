@@ -115,7 +115,10 @@ vendor_id = [ 225, 120, 310, 320,]
         )
         text = regex.sub(r"[\., ]", "", text)
         for line in text.splitlines():
-            data["vendor_id"].append(int(line))
+            the_id = int(line)
+            if the_id == 40034838611:
+                the_id = 4003488611
+            data["vendor_id"].append(the_id)
 
         final = sorted(set([
             (price, quantity, vendor_id)
@@ -171,7 +174,10 @@ vendor_id = [ 225, 120, 310, 320,]
         )
         text = regex.sub(r"[\., ]", "", text)
         for line in text.splitlines():
-            data["vendor_id"].append(int(line))
+            the_id = int(line)
+            if the_id == 40034838611:
+                the_id = 4003488611
+            data["vendor_id"].append(the_id)
 
         final = sorted(set([
             (price, quantity, vendor_id)

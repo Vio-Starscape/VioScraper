@@ -4,6 +4,7 @@ import time
 import datetime
 import toml
 import requests
+import keyboard
 import json
 from dotenv import load_dotenv
 from vio_scraper import ProcessManager, ItemScraper, ItemNotFound
@@ -31,7 +32,7 @@ def add_scan_to_database(items: dict):
         cached.append(items)
         bad = False
         for item in cached:
-            if len(item["items"]) < 30:
+            if len(item["items"]) < 100:
                 continue
             res = requests.post(
                 os.getenv("URL"),
@@ -74,6 +75,9 @@ def main(config: dict):
                     except ItemNotFound as e:
                         print(e)
                         break
+                    if keyboard.is_pressed("q"):
+                        broken = True
+                        break
             if broken:
                 break
         except KeyboardInterrupt:
@@ -86,3 +90,5 @@ if __name__ == "__main__":
         config = toml.load(f)
 
     main(config)
+    # time.sleep(5)
+    # test_function(config)

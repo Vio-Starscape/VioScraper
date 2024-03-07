@@ -53,7 +53,7 @@ class ItemScraper:
             # while ImageGrab.grab().getpixel(config["item_background"]) != (20, 20, 20) and not keyboard.is_pressed("q"):
             time.sleep(0.1)
             if not self.waitForItemLoad():
-                break
+                raise ItemNotFound("Item not found")
             img, extra_sells, extra_buys = self.improvedScanItem()
             # Image.fromarray(img).save(f"unknown{count}.png")
             queue.put(
@@ -86,11 +86,14 @@ class ItemScraper:
                         continue
                     if result["name"].endswith("tag"):
                         continue
+                    result["name"] = result["name"].replace(".", "")
                     if result["name"] not in current_iter["items"]:
                         current_iter["items"][result["name"]] = result["data"]
                     else:
                         current_iter["items"][result["name"]]["buy"].extend(result["data"]["buy"])
+                        current_iter["items"][result["name"]]["buy"] = list(set(current_iter["items"][result["name"]]["buy"]))
                         current_iter["items"][result["name"]]["sell"].extend(result["data"]["sell"])
+                        current_iter["items"][result["name"]]["sell"] = list(set(current_iter["items"][result["name"]]["sell"]))
                 images = []
 
     def new_complete_scrape(self, location: str = "c1"):
@@ -103,6 +106,9 @@ class ItemScraper:
         pydirectinput.press("down")
         pydirectinput.press("down")
         pydirectinput.press("down")
+
+        # for _ in range(5):
+        #     pydirectinput.press("left")
         cpus = multiprocessing.cpu_count()
         queue = Queue()
         with ProcessPoolExecutor(max_workers=cpus) as executor:
@@ -113,17 +119,29 @@ class ItemScraper:
             grabber.join()
             queue.put(None)  # signal to processor that grabbing is done
             processor.join()
+        # self.click_at_location_name("open_item")
         pydirectinput.press("\\")
-        for _ in range(4):
+        self.click_at_location_name("first_row")
+        self.click_at_location_name("Armor")
+        time.sleep(0.5)
+        self.click_at_location_name("All")
+        time.sleep(0.5)
+        self.click_at_location_name("Resources")
+        time.sleep(0.5)
+        self.click_at_location_name("All")
+
+        for _ in range(5):
+            time.sleep(0.1)
+            pydirectinput.press("\\")
+            # time.sleep(0.1)
+            # self.click_at_location_name("terminal_x")
+            # time.sleep(0.1)
+            # pydirectinput.press("f")
             time.sleep(0.1)
             pydirectinput.press("\\")
             time.sleep(0.1)
-            self.click_at_location_name("terminal_x")
-            time.sleep(0.1)
-            pydirectinput.press("f")
-            time.sleep(0.1)
-            pydirectinput.press("\\")
-            time.sleep(0.1)
+        if len(current_iter["items"]) < 100:
+            raise ItemNotFound("No items found")
         return current_iter
 
     def closeItem(self):
@@ -208,12 +226,13 @@ class ItemScraper:
         clicked = False
         clicked2= False
         while grab.getpixel(self.config["item_background"]) != (20, 20, 20):
-            if time.perf_counter() - start > 1 and not clicked:
-                self.click_at_location_name("open_item") # This works really well for catching the item
-                clicked = True
-            if time.perf_counter() - start > 2 and not clicked2:
-                self.click_at_location_name("open_item") # This works really well for catching the item
-                clicked2 = True
+            self.click_at_location_name("open_item")
+            # if time.perf_counter() - start > 1 and not clicked:
+            #     self.click_at_location_name("open_item") # This works really well for catching the item
+            #     clicked = True
+            # if time.perf_counter() - start > 2 and not clicked2:
+            #     self.click_at_location_name("open_item") # This works really well for catching the item
+            #     clicked2 = True
             if time.perf_counter() - start > 5:
                 return False
             grab = ImageGrab.grab()
