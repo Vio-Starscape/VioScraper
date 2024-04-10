@@ -90,10 +90,12 @@ class ItemScraper:
                     if result["name"] not in current_iter["items"]:
                         current_iter["items"][result["name"]] = result["data"]
                     else:
-                        current_iter["items"][result["name"]]["buy"].extend(result["data"]["buy"])
-                        current_iter["items"][result["name"]]["buy"] = list(set(current_iter["items"][result["name"]]["buy"]))
-                        current_iter["items"][result["name"]]["sell"].extend(result["data"]["sell"])
-                        current_iter["items"][result["name"]]["sell"] = list(set(current_iter["items"][result["name"]]["sell"]))
+                        # current_iter["items"][result["name"]]["buy"].extend(result["data"]["buy"])
+                        # current_iter["items"][result["name"]]["buy"] = list(set(current_iter["items"][result["name"]]["buy"]))
+                        current_iter["items"][result["name"]]["buy"] = result["data"]["buy"]
+                        # current_iter["items"][result["name"]]["sell"].extend(result["data"]["sell"])
+                        # current_iter["items"][result["name"]]["sell"] = list(set(current_iter["items"][result["name"]]["sell"]))
+                        current_iter["items"][result["name"]]["sell"] = result["data"]["sell"]
                 images = []
 
     def new_complete_scrape(self, location: str = "c1"):

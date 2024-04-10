@@ -4,6 +4,7 @@ import regex
 import pytesseract
 from PIL import Image
 import numpy as np
+import uuid
 
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
@@ -65,7 +66,26 @@ vendor_id = [ 225, 120, 310, 320,]
         text = self.text_striping(pytesseract.image_to_string(title, config="--psm 7 "))
         return text.strip().replace("@", "0").replace("[", "I").replace("]", "l")
     
-    def get_buy(self, img: Image, buys: bool = False, sells: bool = False):
+    def there_is_anerror(self, data, img: Image.Image):
+        seen = set()
+        result = []
+        for item in data:
+            two = (item[0], item[1])
+            if two not in seen:
+                seen.add(two)
+                result.append(item)
+            else:
+                try:
+                    # Image.fromarray(img).save(f"DupImg{uuid.uuid4()}.png")
+                    pass
+                except:
+                    pass
+                print(data)
+                print("Duplicate found: ", item)
+        print(result)
+        return result
+
+    def get_buy(self, img: Image.Image, buys: bool = False, sells: bool = False):
 
         data = {
             "price": [],
@@ -85,9 +105,11 @@ vendor_id = [ 225, 120, 310, 320,]
         text = self.text_striping(
             pytesseract.image_to_string(
                 section,
-                config="--psm 6 -c tessedit_char_whitelist=0123456789,."
+                config="--psm 6 -c tessedit_char_whitelist=0@123456789,."
             )
         )
+
+        text = text.replace("@", "0")
         
         text = regex.sub(r"[, ]", "", text)
         for line in text.splitlines():
@@ -98,9 +120,10 @@ vendor_id = [ 225, 120, 310, 320,]
         text = self.text_striping(
             pytesseract.image_to_string(
                 section,
-                config="--psm 6 -c tessedit_char_whitelist=0123456789,."
+                config="--psm 6 -c tessedit_char_whitelist=0@123456789,."
             )
         )
+        text = text.replace("@", "0")
         text = regex.sub(r"[\., ]", "", text)
         for line in text.splitlines():
             data["quantity"].append(int(line))
@@ -120,14 +143,15 @@ vendor_id = [ 225, 120, 310, 320,]
                 the_id = 4003488611
             data["vendor_id"].append(the_id)
 
-        final = sorted(set([
+        final = sorted(self.there_is_anerror([
             (price, quantity, vendor_id)
             for price, quantity, vendor_id in zip(data["price"], data["quantity"], data["vendor_id"])
-        ]), key=lambda x: x[0], reverse=True)
+        ], img), key=lambda x: x[0], reverse=True)
+
 
         return final
     
-    def get_sell(self, img: Image, sells: bool = False):
+    def get_sell(self, img: Image.Image, sells: bool = False):
         
         data = {
             "price": [],
@@ -144,9 +168,11 @@ vendor_id = [ 225, 120, 310, 320,]
         text = self.text_striping(
             pytesseract.image_to_string(
                 section,
-                config="--psm 6 -c tessedit_char_whitelist=0123456789,."
+                config="--psm 6 -c tessedit_char_whitelist=@0123456789,."
             )
         )
+
+        text = text.replace("@", "0")
         
         text = regex.sub(r"[, ]", "", text)
         for line in text.splitlines():
@@ -157,9 +183,10 @@ vendor_id = [ 225, 120, 310, 320,]
         text = self.text_striping(
             pytesseract.image_to_string(
                 section,
-                config="--psm 6 -c tessedit_char_whitelist=0123456789,."
+                config="--psm 6 -c tessedit_char_whitelist=0@123456789,."
             )
         )
+        text = text.replace("@", "0")
         text = regex.sub(r"[\., ]", "", text)
         for line in text.splitlines():
             data["quantity"].append(int(line))
@@ -179,9 +206,9 @@ vendor_id = [ 225, 120, 310, 320,]
                 the_id = 4003488611
             data["vendor_id"].append(the_id)
 
-        final = sorted(set([
+        final = sorted(self.there_is_anerror([
             (price, quantity, vendor_id)
             for price, quantity, vendor_id in zip(data["price"], data["quantity"], data["vendor_id"])
-        ]), key=lambda x: x[0])
+        ], img), key=lambda x: x[0])
 
         return final

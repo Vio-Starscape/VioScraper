@@ -49,6 +49,7 @@ class ProcessManager:
             *self.config["rob_search"]
         ):
             return True
+        time.sleep(5)
         self.jiggle_mouse()
         pydirectinput.doubleClick()
         time.sleep(0.1)
