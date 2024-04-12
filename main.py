@@ -61,7 +61,7 @@ def main(config: dict):
     while True:
         try:
             broken = False
-            with RAM(os.getenv("DISCORD_WEBHOOK_URI"), os.getenv("RAM_PASSWORD"), config) as process:
+            with RAM(os.getenv("DISCORD_WEBHOOK_URI"), os.getenv("RAM_PASSWORD"), os.getenv("RAM_URL"), config) as process:
                 starscraper = ItemScraper(config)
                 while True:
                     try:
