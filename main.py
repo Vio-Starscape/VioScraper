@@ -7,7 +7,7 @@ import requests
 import keyboard
 import json
 from dotenv import load_dotenv
-from vio_scraper import ProcessManager, ItemScraper, ItemNotFound
+from vio_scraper import ProcessManager, ItemScraper, ItemNotFound, RAM
 
 load_dotenv(override=True)
 
@@ -57,10 +57,11 @@ def test_function(config: dict):
     return resp
 
 def main(config: dict):
+    memory = {}
     while True:
         try:
             broken = False
-            with ProcessManager(os.getenv("ROBLOX_GAME_PATH"), config) as process:
+            with RAM(os.getenv("DISCORD_WEBHOOK_URI"), os.getenv("RAM_PASSWORD"), config) as process:
                 starscraper = ItemScraper(config)
                 while True:
                     try:
@@ -74,6 +75,12 @@ def main(config: dict):
                         break
                     except ItemNotFound as e:
                         print(e)
+                        if process.current_account not in memory:
+                            memory[process.current_account] = 1
+                        else:
+                            memory[process.current_account] += 1
+                        if memory[process.current_account] >= 2:
+                            process.mark_account_as_yoinked(process.current_account)
                         break
                     if keyboard.is_pressed("q"):
                         broken = True
