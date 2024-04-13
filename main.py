@@ -69,6 +69,7 @@ def main(config: dict):
                         resp = starscraper.new_complete_scrape()
                         add_scan_to_database(resp)
                         end = time.perf_counter()
+                        memory[process.current_account] = 0
                         print("Time taken: ", end - start)
                     except KeyboardInterrupt:
                         broken = True

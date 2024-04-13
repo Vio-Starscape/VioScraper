@@ -53,6 +53,7 @@ class RAM:
         )
         print("Found logo")
         pydirectinput.moveTo(*self.config["starscape_button"])
+        pydirectinput.click()
         self.jiggle_mouse()
         time.sleep(1)
         pydirectinput.click()
