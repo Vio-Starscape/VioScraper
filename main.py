@@ -36,6 +36,7 @@ def add_scan_to_database(items: dict):
                 continue
             res = requests.post(
                 os.getenv("URL"),
+                headers={"x-api-key": os.getenv("VIO_API_KEY")},
                 json=json.loads(json.dumps(item, default=datetime_handler))
             )
             if res.status_code != 200:
