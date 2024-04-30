@@ -1,82 +1,97 @@
-import pymongo
 import os
 import logging
 import time
+import datetime
+import toml
+import requests
+import keyboard
+import json
 from dotenv import load_dotenv
-from pprint import pprint
-from vio_scraper import ProcessManager, ItemScraper
+from vio_scraper import ProcessManager, ItemScraper, ItemNotFound, RAM
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.CRITICAL + 1)
+load_dotenv(override=True)
+
+logger = logging.getLogger("LucaScraper")
+logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler()
 form = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 console_handler.setFormatter(form)
-console_handler.setLevel(logging.CRITICAL + 1)
+console_handler.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
 
-load_dotenv()
+cached = []
 
-item_list = [
-    "Korrelite",
-    "Gellium",
-    "Axnit",
-    "Reknite",
-    "Narcor",
-    "Red Narcor",
-    "Vexnium",
-    "Water"
-]
-
-config = {
-    "search": [839, 50],
-    "search_color": [70, 72, 74],
-    "play_button": [305, 704],
-    "play_button_color": [0, 159, 100],
-    "starscape_button": [950, 556],
-    "starscape_logo": [964, 451],
-    "starscape_color": [240, 216, 95],
-    "starscape_health": [917, 986],
-    "starscape_health_color": [20, 180, 20],
-}
-
-mongo = pymongo.MongoClient(os.getenv("MONGO_URI"))
+def datetime_handler(x):
+    if isinstance(x, datetime.datetime):
+        return x.isoformat()
+    raise TypeError("Unknown type")
 
 def add_scan_to_database(items: dict):
-    pprint(items)
-    value = mongo.Vio.Items.find_one_and_update(
-        {"_id": 0},
-        {"$inc": {"count": 1}}
-    )
-    items["_id"] = value["count"]
-    mongo.Vio.Items.insert_one(items)
+    try:
+        print("Adding to database")
+        cached.append(items)
+        bad = False
+        for item in cached:
+            if len(item["items"]) < 100:
+                continue
+            res = requests.post(
+                os.getenv("URL"),
+                headers={"x-api-key": os.getenv("VIO_API_KEY")},
+                json=json.loads(json.dumps(item, default=datetime_handler)),
+                timeout=50
+            )
+            if res.status_code != 200:
+                bad = True
+                print(res.text)
+        if not bad:
+            cached.clear()
+    except Exception as e:
+        print(e)
 
-# if __name__ == "__main__":
-#     from PIL import Image
-#     import numpy as np
-#     tab = TableExtraction()
-#     # starscraper = ItemScraper(tab)
-#     print(tab.extract_table("merged_image.png"))
+def test_function(config: dict):
+    starscraper = ItemScraper(config)
+    start = time.perf_counter()
+    resp = starscraper.new_complete_scrape()
+    print(resp)
+    add_scan_to_database(resp)
+    end = time.perf_counter()
+    print("Time taken: ", end - start)
+    return resp
 
-#     # original = np.array(Image.open("test0.png"))
-#     # buys = np.array(Image.open("test1.png"))
-#     # sells = np.array(Image.open("test2.png"))
-#     # img = Image.fromarray(starscraper.merge_screenshot(original, sells, buys))
-#     # img.save("merged_image.png")
-
-if __name__ == "__main__":
+def main(config: dict):
+    memory = {}
     while True:
         try:
             broken = False
-            with ProcessManager(os.getenv("ROBLOX_GAME_PATH"), config) as process:
-                starscraper = ItemScraper()
+            with RAM(
+                    os.getenv("DISCORD_WEBHOOK_URI"),
+                    os.getenv("RAM_PASSWORD"),
+                    os.getenv("RAM_URL"),
+                    os.getenv("SCRAPER_URL"),
+                    os.getenv("VIO_API_KEY"),
+                    config) as process:
+                starscraper = ItemScraper(config)
                 while True:
                     try:
                         start = time.perf_counter()
-                        resp = starscraper.better_scrape(item_list)
-                        print(resp)
+                        resp = starscraper.new_complete_scrape()
                         add_scan_to_database(resp)
                         end = time.perf_counter()
+                        memory[process.current_account] = 0
                         print("Time taken: ", end - start)
                     except KeyboardInterrupt:
+                        broken = True
+                        break
+                    except ItemNotFound as e:
+                        print(e)
+                        if process.current_account not in memory:
+                            memory[process.current_account] = 1
+                        else:
+                            memory[process.current_account] += 1
+                        if memory[process.current_account] >= 4:
+                            process.mark_account_as_yoinked(process.current_account)
+                        break
+                    if keyboard.is_pressed("q"):
                         broken = True
                         break
             if broken:
@@ -86,4 +101,10 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
+if __name__ == "__main__":
+    with open("config1080p.toml", "r") as f:
+        config = toml.load(f)
 
+    main(config)
+    # time.sleep(5)
+    # test_function(config)

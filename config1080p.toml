@@ -1,0 +1,68 @@
+rob_search = [ 839, 50,]
+search_color = [ 70, 72, 74,]
+play_button = [ 305, 704,]
+play_button_color = [ 0, 159, 100,]
+starscape_button = [ 950, 556,]
+starscape_logo = [ 964, 451,]
+starscape_color = [ 240, 216, 95,]
+starscape_health = [ 917, 986,]
+starscape_health_color = [ 20, 180, 20,]
+search = [ 658, 758,]
+first_row = [ 993, 333,]
+open_item = [ 1228, 816,]
+last_row = [1114, 813,]
+close_item = [ 1121, 254,]
+first_sell_row = [ 895, 370,]
+first_buy_row = [ 865, 600,]
+item_background = [ 995, 344,]
+item = [ 793, 247, 1127, 802,]
+sell_box = [ 793, 368, 1127, 565,]
+sell_wheel = [ 1112, 373,]
+buy_wheel = [ 1112, 603,]
+item_x = [ 1122, 254,]
+terminal_x = [1329, 202,]
+buy_box = [ 793, 600, 1127, 795,]
+volume = [ 1008, 324, 1117, 341,]
+switch_to_sell = [ 707, 276,]
+switch_to_buy = [ 957, 276,]
+name = [ 793, 254, 1033, 269,]
+
+top_of_listing = [ 1115, 310,]
+bottom_of_listing = [ 1115, 819,]
+bottom_of_bar = [ 1122,818,]
+item_list = [728, 312, 1114, 827,]
+item_list_name = [37, 7, 200, 20]
+
+All = [649,321]
+Armor = [649, 341]
+Resources = [644, 484]
+
+item_list_location = [
+    [908, 331,], 
+    [908, 368,], 
+    [908, 407,], 
+    [908, 441,], 
+    [908, 480,], 
+    [908, 513,], 
+    [908, 552,], 
+    [908, 586,], 
+    [908, 625,], 
+    [908, 659,]
+]
+
+# OCR settings
+
+item_name = [ 2, 4, 200, 17,]
+
+[buy]
+price = [ 8, 350, 108, 550,]
+quantity = [ 118, 350, 208, 550,]
+vendor_id = [ 225, 350, 310, 550,]
+
+[sell]
+price = [ 8, 120, 108, 320,]
+quantity = [ 118, 120, 208, 320,]
+vendor_id = [ 225, 120, 310, 320,]
+
+# Multiple Item
+

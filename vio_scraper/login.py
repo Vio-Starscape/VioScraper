@@ -13,7 +13,8 @@ class ProcessManager:
 
     def __enter__(self):
         self.subprocess = subprocess.Popen([self.find_roblox()])
-        self.login_sequence()
+        while self.login_sequence():
+            pass
         return self
     
     def __exit__(self, exc_type, exc_value, exc_traceback):
@@ -37,23 +38,29 @@ class ProcessManager:
     def login_sequence(self):
 
         def wait_for(func, *args):
+            initial = time.perf_counter()
             while not func(*args):
-                pass
-        pydirectinput.moveTo(*self.config["search"])
-        wait_for(
+                if time.perf_counter() - initial > 20:
+                    return False
+            return True
+        pydirectinput.moveTo(*self.config["rob_search"])
+        if not wait_for(
             lambda x, y: ImageGrab.grab().getpixel((x, y)) == tuple(self.config["search_color"]), 
-            *self.config["search"]
-        )
+            *self.config["rob_search"]
+        ):
+            return True
+        time.sleep(5)
         self.jiggle_mouse()
         pydirectinput.doubleClick()
         time.sleep(0.1)
         pydirectinput.write("Starscape")
         time.sleep(0.1)
         pydirectinput.press("enter")
-        wait_for(
+        if not wait_for(
             lambda x, y: ImageGrab.grab().getpixel((x, y)) == tuple(self.config["search_color"]), 
-            *self.config["search"]
-        )
+            *self.config["rob_search"]
+        ):
+            return True
         pydirectinput.moveTo(*self.config["play_button"])
         self.jiggle_mouse()
         time.sleep(2)

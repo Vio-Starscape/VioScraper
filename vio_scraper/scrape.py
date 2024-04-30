@@ -1,219 +1,186 @@
-import time
-import cv2
 import logging
 import pydirectinput
 import pyautogui
-import os
-import json
 import numpy as np
+import time
+import keyboard
 import multiprocessing
-from PIL import ImageGrab, Image, ImageDraw
-from .extraction import TableExtraction
+import sys
+from queue import Queue
+from threading import Thread
+from concurrent.futures import ProcessPoolExecutor
+from PIL import ImageGrab, Image
+from .extraction import ImageProcessing
 from datetime import datetime, timezone
 
 logger = logging.getLogger("LucaScraper")
 
-#import data from config1080p.json
-dir_path = os.path.dirname(os.path.realpath(__file__))
-dir_path = os.path.join(dir_path, "config1080p.json")
-with open(dir_path) as f:
-    coordinates = json.load(f)
-
 class ItemNotFound(Exception):
     pass
 
-############################
-# Config                   #
-############################
-
-def worker_init(path: str | None):
-    global table
-    table = TableExtraction(
-        rec_model_dir=path,
-    )
-
-def worker(data):
-    return table.extract_table(data)
+def unknown_worker(data):
+    img = ImageProcessing()
+    try:
+        info = img.extract_data_from_image(data["image"], data["extra_buy"], data["extra_sell"])
+        return {
+            "name": info["name"],
+            "data": info
+        }
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return None
 
 class ItemScraper:
 
     max_rows = 8
     table_scale = 2 # Upscale for orders
-    row_height = 17
+    row_height = 37
 
-    def __init__(self, model_path: str = None) -> None:
+    def __init__(self, config: dict, model_path: str = None) -> None:
+        self.config = config
         self.model_path = model_path
+        self.processor = ImageProcessing()
 
-    def better_scrape(self, items: list, location: str = "c1"):
+    def grab_images(self, queue, config):
+        time.sleep(1)
+        grab = ImageGrab.grab()
+        while (not keyboard.is_pressed("q"))\
+            and any([grab.getpixel((config["top_of_listing"][0], y)) == (255, 255, 255) for y in range(config["top_of_listing"][1], config["bottom_of_listing"][1]+20)]):
+            time.sleep(0.1)
+            pydirectinput.press("enter")
+            time.sleep(0.1)
+            self.click_at_location_name("open_item")
+            # while ImageGrab.grab().getpixel(config["item_background"]) != (20, 20, 20) and not keyboard.is_pressed("q"):
+            time.sleep(0.1)
+            if not self.waitForItemLoad():
+                raise ItemNotFound("Item not found")
+            img, extra_sells, extra_buys = self.improvedScanItem()
+            # Image.fromarray(img).save(f"unknown{count}.png")
+            queue.put(
+                {
+                    "name": "unknown",
+                    "extra_sell": extra_sells,
+                    "extra_buy": extra_buys,
+                    "image" : img
+                }
+            )
+            self.closeItem()
+            time.sleep(0.1)
+            pydirectinput.press("down")
+            time.sleep(0.1)
+            grab = ImageGrab.grab()
+        if keyboard.is_pressed("q"):
+            sys.exit(0)
+
+    def process_images(self, queue, executor, current_iter, cpus=8):
+        images = []
+        while True:
+            data = queue.get()
+            if data is None:  # sentinel value to indicate end of processing
+                break
+            images.append(data)
+            if len(images) == cpus:
+                results = list(executor.map(unknown_worker, images))
+                for result in results:
+                    if result is None:
+                        continue
+                    if result["name"].endswith("tag"):
+                        continue
+                    result["name"] = result["name"].replace(".", "")
+                    if result["name"] not in current_iter["items"]:
+                        current_iter["items"][result["name"]] = result["data"]
+                    else:
+                        # current_iter["items"][result["name"]]["buy"].extend(result["data"]["buy"])
+                        # current_iter["items"][result["name"]]["buy"] = list(set(current_iter["items"][result["name"]]["buy"]))
+                        current_iter["items"][result["name"]]["buy"] = result["data"]["buy"]
+                        # current_iter["items"][result["name"]]["sell"].extend(result["data"]["sell"])
+                        # current_iter["items"][result["name"]]["sell"] = list(set(current_iter["items"][result["name"]]["sell"]))
+                        current_iter["items"][result["name"]]["sell"] = result["data"]["sell"]
+                images = []
+
+    def new_complete_scrape(self, location: str = "c1"):
         current_iter = {
             "location": location,
             "time_scanned": datetime.now(timezone.utc),
             "items": {}
         }
+        pydirectinput.press("\\")
+        pydirectinput.press("down")
+        pydirectinput.press("down")
+        pydirectinput.press("down")
+
+        # for _ in range(5):
+        #     pydirectinput.press("left")
         cpus = multiprocessing.cpu_count()
-        with multiprocessing.Pool(min(cpus, len(items)), initializer=worker_init, initargs=(self.model_path,)) as p:
-            images = []
-            for item in items:
-                logger.debug("Scraping item: " + item)
-                while True:
-                    self.focusItemInList(item)
-                    time.sleep(0.5)
-
-                    if self.validate_item_exists():
-                        x = 0
-                        while not (ImageGrab.grab().getpixel(tuple(coordinates["item_x"])) == (240,240,240)):
-                            self.openXItemInList(0)
-                            x += 1
-                            if x > 10:
-                                raise ItemNotFound(f"{item} not found")
-                        self.waitForItemLoad()
-                        item_scan = self.improvedScanItem()
-                        self.closeItem()
-                        images.append(
-                            {
-                                "name": item,
-                                "image" : item_scan
-                            }
-                        )
-                        break
-                    else:
-                        continue
-            
-            groups = [images[i:i + cpus] for i in range(0, len(images), cpus)]
-            for group in groups:
-                results = p.map(worker, group)
-                for result in results:
-                    data = self.scanItem(result["data"])
-                    current_iter["items"][result["name"]] = data
-            current_iter["end_time_scanned"] = datetime.now(timezone.utc)
-        return current_iter
-
-    def openXItemInList(self, x):
-        self.click_at_location_name_with_offet("first_row", x * self.row_height)
-        self.click_at_location_name("open_item")
-
-
-    def validate_item_exists(self):
-        coords = tuple(coordinates["first_row"])
-        return ImageGrab.grab().getpixel(coords) != (30,30,30)
-
-    def focusItemInList(self, name):
-        self.click_at_location_name("search")
-        time.sleep(1)
-        pydirectinput.write(name, interval=0.1)
-        pydirectinput.press("enter")
-        time.sleep(1)
-
-    def openTopItemInList(self):
+        queue = Queue()
+        with ProcessPoolExecutor(max_workers=cpus) as executor:
+            grabber = Thread(target=self.grab_images, args=(queue, self.config))
+            processor = Thread(target=self.process_images, args=(queue, executor, current_iter, cpus))
+            grabber.start()
+            processor.start()
+            grabber.join()
+            queue.put(None)  # signal to processor that grabbing is done
+            processor.join()
+        # self.click_at_location_name("open_item")
+        pydirectinput.press("\\")
         self.click_at_location_name("first_row")
-        self.click_at_location_name("open_item")
+        self.click_at_location_name("Armor")
+        time.sleep(0.5)
+        self.click_at_location_name("All")
+        time.sleep(0.5)
+        self.click_at_location_name("Resources")
+        time.sleep(0.5)
+        self.click_at_location_name("All")
+
+        for _ in range(5):
+            time.sleep(0.1)
+            pydirectinput.press("\\")
+            # time.sleep(0.1)
+            # self.click_at_location_name("terminal_x")
+            # time.sleep(0.1)
+            # pydirectinput.press("f")
+            time.sleep(0.1)
+            pydirectinput.press("\\")
+            time.sleep(0.1)
+        if len(current_iter["items"]) < 100:
+            raise ItemNotFound("No items found")
+        return current_iter
 
     def closeItem(self):
         self.click_at_location_name("close_item")
 
     def merge_screenshot(self, original: np.array, sells: np.array = None, buys: np.array = None) -> np.ndarray:
         if buys is not None:
-            split_point = coordinates["buy"][3] - coordinates["item"][1]
+            split_point = self.config["buy_box"][3] - self.config["item"][1]
             top = original[:split_point, :]
             bottom = original[split_point:, :]
             original = np.concatenate((top, buys, bottom), axis=0)
         if sells is not None:
-            split_point = coordinates["sell"][3] - coordinates["item"][1]
+            split_point = self.config["sell_box"][3] - self.config["item"][1]
             top = original[:split_point, :]
             bottom = original[split_point:, :]
             original = np.concatenate((top, sells, bottom), axis=0)
-
-        height = original.shape[0]
-        original_pil = Image.fromarray(original)
-        draw = ImageDraw.Draw(original_pil)
-        height = original_pil.height
-        for x in [76, 210]:
-            draw.line([(x, 0), (x, height)], fill=(0, 0, 0), width=5)
-
-        original = np.array(original_pil)
-
         return original
 
     def improvedScanItem(self) -> np.ndarray:
-        inital_screenshot = self.take_screenshot_of_region("item")
+        initial_screenshot = self.take_screenshot_of_region("item")
         sell_screenshot, buy_screenshot = None, None
-        if self.get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
-            while self.get_color_at_pixel(coordinates["sell_wheel"]) == (143, 143, 143):
+        if ImageGrab.grab().getpixel(self.config["sell_wheel"]) == (143, 143, 143):
+            while ImageGrab.grab().getpixel(self.config["sell_wheel"]) == (143, 143, 143):
                 self.click_at_location_name("sell_wheel")
                 pydirectinput.dragRel(None, 180, 0.5, button="left")
-            sell_screenshot = self.take_screenshot_of_region("sell")
-        if self.get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
-            while self.get_color_at_pixel(coordinates["buy_wheel"]) == (143, 143, 143):
+            sell_screenshot = self.take_screenshot_of_region("sell_box")
+        if ImageGrab.grab().getpixel(self.config["buy_wheel"]) == (143, 143, 143):
+            while ImageGrab.grab().getpixel(self.config["buy_wheel"]) == (143, 143, 143):
                 self.click_at_location_name("buy_wheel")
                 pydirectinput.dragRel(None, 180, 0.5, button="left")
-            buy_screenshot = self.take_screenshot_of_region("buy")
+            buy_screenshot = self.take_screenshot_of_region("buy_box")
         final_screenshot = self.merge_screenshot(
-            inital_screenshot, 
+            initial_screenshot, 
             sell_screenshot, 
             buy_screenshot
         )
-        return final_screenshot
-    
-    def extract_listings(self, data: list[tuple[str, str, str]]):
-        listings = data[5:]
-        sells, buys = [], []
-        buy_flag = False
-        for listing in listings:
-            if listing[2] == "Station":
-                continue
-            if listing[2].isdigit():
-                if buy_flag:
-                    buys.append(listing)
-                else:
-                    sells.append(listing)
-            else:
-                buy_flag = True
-        return sells, buys
-
-    def scanItem(self, data):
-        print(data)
-        name = data[0][0]
-        volume = data[3][2]
-
-        sells, buys = self.extract_listings(data)
-
-        def clean_input(x: str, n: list[tuple[str, str, str]], index: int = 2):
-            if x == "":
-                if index == 0:
-                    max_price = max([float(x[0]) for x in n if x[0] != ""])
-                    if max_price < 6:
-                        return 4
-                    else:
-                        return 6
-                elif index == 1:
-                    return 1
-            return x.replace(",", "").replace(" ", "").replace("/", "7").replace("A", "4")
-        
-        sells = sorted(
-            list(set([
-                (float(clean_input(x[0], sells, 0)), int(clean_input(x[1], sells, 1)), int(clean_input(x[2], sells))) 
-                for x in sells if x[2] != "Station"
-            ])), 
-            key=lambda x: x[0]
-        )
-
-        buys = sorted(
-            list(set([
-                (float(clean_input(x[0], buys, 0)), int(clean_input(x[1], buys, 1)), int(clean_input(x[2], buys))) 
-                for x in buys if x[2] != "Station"
-            ])), 
-            key=lambda x: x[0],
-            reverse=True
-        )
-
-        payload = {
-            "name": name,
-            "volume": volume, 
-            "buy": buys,
-            "sell":  sells,
-        }
-        logger.debug(payload)
-        return payload
+        return final_screenshot, sell_screenshot is not None, buy_screenshot is not None
 
     def jiggle(self):
         pydirectinput.move(0, 1)
@@ -232,16 +199,16 @@ class ItemScraper:
         pydirectinput.click()
 
     def click_at_location_name(self, name):
-        self.click_once_at(*coordinates[name])
+        self.click_once_at(*self.config[name])
 
     def click_at_location_name_with_offet(self, name, offset):
-        x_y = coordinates[name]
+        x_y = self.config[name]
         x = x_y[0]
         y = x_y[1] + offset
         self.click_once_at(x, y)
 
     def take_screenshot_of_region(self, region):
-        region_bounds = coordinates[region]
+        region_bounds = self.config[region]
         usable_bounds = self.raw_region_to_usable_region(region_bounds)
         return self.take_photo_with_predefined_coords(usable_bounds)
 
@@ -256,50 +223,19 @@ class ItemScraper:
         return([old[0], old[1], diff_x, diff_y])
 
     def waitForItemLoad(self):
-        counter = 0
-        count = 0
-        time.sleep(0.001)
-        while counter < 30:
-            if count > 5: 
-                return True
-            if type == "sell":
-                if self.validate_color_at_coords(coordinates["first_sell_row"], 32): count += 1
-            else:
-                if self.validate_color_at_coords(coordinates["first_buy_row"], 32): count += 1
-            counter += 1
-            time.sleep(0.1)
-        return False
-
-    def validate_color_at_coords(self, coordinates, brightness):
-        pixel = self.get_color_at_pixel(coordinates)
-        if pixel[0] > brightness or pixel[1] > brightness or pixel[2] > brightness:
-            return True
-        else:
-            return False
-
-    def get_color_at_pixel(self, coordinates):
-        try:
-            pixel = pyautogui.pixel(coordinates[0], coordinates[1])
-        except: 
-            pixel = pyautogui.pixel(coordinates[0], coordinates[1])
-        return pixel
-
-    def validate_consistent_color_at_coords(self, coordinates, brightness, min = 8):
-        counter = 0
-        hits = 0
-        last_pixel = self.get_color_at_pixel(coordinates)
-        while counter < 30:
-            logger.debug(last_pixel)
-            current_pixel = self.get_color_at_pixel(coordinates)
-            if last_pixel != current_pixel: 
-                hits = 0
-                last_pixel = current_pixel
-            if hits > min:
-                logger.debug("exists")
-                return True
-            if(self.validate_color_at_coords(coordinates, brightness)): hits += 1
-            elif hits > 0: hits += -1
-            counter += 1
-        logger.debug("not open")
-        return False
-    
+        start = time.perf_counter()
+        grab = ImageGrab.grab()
+        clicked = False
+        clicked2= False
+        while grab.getpixel(self.config["item_background"]) != (20, 20, 20):
+            self.click_at_location_name("open_item")
+            # if time.perf_counter() - start > 1 and not clicked:
+            #     self.click_at_location_name("open_item") # This works really well for catching the item
+            #     clicked = True
+            # if time.perf_counter() - start > 2 and not clicked2:
+            #     self.click_at_location_name("open_item") # This works really well for catching the item
+            #     clicked2 = True
+            if time.perf_counter() - start > 5:
+                return False
+            grab = ImageGrab.grab()
+        return True
