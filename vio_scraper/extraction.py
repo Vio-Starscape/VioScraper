@@ -54,6 +54,7 @@ vendor_id = [ 225, 120, 310, 320,]
         text = regex.sub(r"\n[\s]+", "\n", text)
         text = regex.sub(r"\n?Station|[\s]+$", "", text)
         text = text.replace("VYexnium", "Vexnium")
+        text = text.replace("Water", "Water")
         return text
     
     def get_item_name(self, img: Image):
