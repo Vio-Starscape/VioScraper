@@ -1,12 +1,13 @@
 import toml
+import os
 import cv2
 import regex
 import pytesseract
 from PIL import Image
 import numpy as np
-import uuid
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if os.name == "nt":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 class ImageProcessing:
     def __init__(self):
