@@ -1,4 +1,6 @@
-from .scrape import ItemScraper, ItemNotFound
-from .login import ProcessManager
+import os
 from .extraction import ImageProcessing
-from .ram import RAM
+if os.name == "nt":
+    from .scrape import ItemScraper, ItemNotFound
+    from .login import ProcessManager
+    from .ram import RAM
