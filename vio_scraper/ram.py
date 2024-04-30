@@ -7,13 +7,15 @@ import time
 from discord_webhooks import DiscordWebhooks
 
 class RAM:
-    def __init__(self, webhook_url: str, password: str, baseuri:str, config: dict):
+    def __init__(self, webhook_url: str, password: str, ramuri:str, uri: str, apikey:str, config: dict):
         self.webhook_url = webhook_url
         self.password = password
         self.config = config
-        self.baseuri = baseuri
+        self.ramuri = ramuri
+        self.uri = uri
+        self.apikey = apikey
 
-        self.current_account = None
+        self.current_account: dict | None = None
 
     def __enter__(self):
         while self.login_sequence():
@@ -23,12 +25,50 @@ class RAM:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.exit_roblox()
 
+    def update_here(self):
+        r = requests.get(f'{self.uri}/api/scraper/getall',
+                         headers={"x-api-key": self.apikey})
+        print(r.status_code)
+        print(r.content)
+        response_data = r.json()
+
+        current_accounts = self.get_accounts_json()
+
+        for account in response_data:
+            print(account)
+            if current_accounts[account["name"]] == "yoinked" and not account["yoinked"]:
+                print("here")
+                self.unmark_yoinked_account(account["name"])
+            elif current_accounts[account["name"]] != "yoinked" and account["yoinked"]:
+                print("Here2")
+                self.mark_account_as_yoinked(account["name"])
+        
+        print("Update Done!")
+    
+    def update_there(self):
+        account_data = []
+        for name, description in self.get_accounts_json().items():
+            account_data.append({
+                "name": name,
+                "active": self.current_account is not None and name in self.current_account.keys(),
+                "yoinked": "yoinked" in description
+            })
+        r = requests.post(
+            f'{self.uri}/api/scraper/bulk_update',
+            headers={"x-api-key": self.apikey},
+            json=account_data
+        )
+        print(r.status_code)
+        print(r.content)
+
     def jiggle_mouse(self):
         pydirectinput.moveRel(1, 1)
         time.sleep(0.01)
         pydirectinput.moveRel(-1, -1)
     
     def login_sequence(self):
+
+        self.update_here()
 
         accounts = self.get_non_yoinked_accounts()
         if len(accounts) == 0:
@@ -37,6 +77,8 @@ class RAM:
         self.launch_account()
 
         print("Using account: ", self.current_account)
+
+        self.update_there()
 
         def wait_for(func, *args, func2 = None):
             initial = time.perf_counter()
@@ -71,7 +113,7 @@ class RAM:
                 proc.kill()
 
     def get_accounts_json(self):
-        r = requests.get(f'{self.baseuri}/GetAccountsJson?Password={self.password}')
+        r = requests.get(f'{self.ramuri}/GetAccountsJson?Password={self.password}')
         return {
             i["Username"]: i["Description"]
             for i in r.json()
@@ -84,9 +126,11 @@ class RAM:
     def launch_account(self):
         account = self.current_account
         try:
-            r = requests.get(f'{self.baseuri}/LaunchAccount?Account={account}&PlaceId=679715583&Password={self.password}', timeout=1)
+            r = requests.get(f'{self.ramuri}/LaunchAccount?Account={account}&PlaceId=679715583&Password={self.password}', timeout=1)
         except requests.exceptions.ReadTimeout:
-            return
+            pass
+
+        self.update_there()
         
     def bring_to_front(self):
         try:
@@ -100,7 +144,7 @@ class RAM:
         
     def mark_account_as_yoinked(self, account: str):
         r = requests.post(
-            f'{self.baseuri}/SetDescription?Account={account}&Password={self.password}',
+            f'{self.ramuri}/SetDescription?Account={account}&Password={self.password}',
             data="yoinked"
         )
         hook = DiscordWebhooks(webhook_url=self.webhook_url)
@@ -110,8 +154,6 @@ class RAM:
 
     def unmark_yoinked_account(self, account: str):
         r = requests.post(
-            f'{self.baseuri}/SetDescription?Account={account}&Password={self.password}',
-            data=""
+            f'{self.ramuri}/SetDescription?Account={account}&Password={self.password}',
+            data="Primed"
         )
-
-        return r

@@ -63,7 +63,13 @@ def main(config: dict):
     while True:
         try:
             broken = False
-            with RAM(os.getenv("DISCORD_WEBHOOK_URI"), os.getenv("RAM_PASSWORD"), os.getenv("RAM_URL"), config) as process:
+            with RAM(
+                    os.getenv("DISCORD_WEBHOOK_URI"),
+                    os.getenv("RAM_PASSWORD"),
+                    os.getenv("RAM_URL"),
+                    os.getenv("SCRAPER_URL"),
+                    os.getenv("VIO_API_KEY"),
+                    config) as process:
                 starscraper = ItemScraper(config)
                 while True:
                     try:
