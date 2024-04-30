@@ -37,7 +37,8 @@ def add_scan_to_database(items: dict):
             res = requests.post(
                 os.getenv("URL"),
                 headers={"x-api-key": os.getenv("VIO_API_KEY")},
-                json=json.loads(json.dumps(item, default=datetime_handler))
+                json=json.loads(json.dumps(item, default=datetime_handler)),
+                timeout=50
             )
             if res.status_code != 200:
                 bad = True
@@ -81,7 +82,7 @@ def main(config: dict):
                             memory[process.current_account] = 1
                         else:
                             memory[process.current_account] += 1
-                        if memory[process.current_account] >= 2:
+                        if memory[process.current_account] >= 4:
                             process.mark_account_as_yoinked(process.current_account)
                         break
                     if keyboard.is_pressed("q"):
