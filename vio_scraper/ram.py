@@ -24,6 +24,7 @@ class RAM:
             time.sleep(10)
 
         print("Updating here...")
+        self.update_there()
         self.update_here()
         while self.login_sequence():
             pass
@@ -57,7 +58,7 @@ class RAM:
                 "yoinked": "yoinked" in description
             })
         r = requests.post(
-            f'{self.uri}/api/scraper/bulk_update',
+            f'{self.uri}/api/scraper/sync',
             headers={"x-api-key": self.apikey},
             json=account_data
         )
@@ -130,6 +131,9 @@ class RAM:
             r = requests.get(f'{self.ramuri}/LaunchAccount?Account={account}&PlaceId=679715583&Password={self.password}', timeout=1)
         except requests.exceptions.ReadTimeout:
             pass
+        r = requests.post(f'{self.uri}/api/scraper/update/active',
+                         headers={"x-api-key": self.apikey},
+                         json={"name": account, "active": True, "yoinked": False})
         
     def bring_to_front(self):
         try:
@@ -146,6 +150,9 @@ class RAM:
             f'{self.ramuri}/SetDescription?Account={account}&Password={self.password}',
             data="yoinked"
         )
+        r = requests.post(f'{self.uri}/api/scraper/update/yoinked',
+                         headers={"x-api-key": self.apikey},
+                         json={"name": account, "active": False, "yoinked": True})
         hook = DiscordWebhooks(webhook_url=self.webhook_url)
         hook.set_content(title="Account Yoinked", description=f"Account {account} has been yoinked")
         hook.add_field(name="List of accounts", value="\n".join([f"{name}: {desc if desc else 'Good'}" for name, desc in self.get_accounts_json().items()]))
@@ -154,5 +161,5 @@ class RAM:
     def unmark_yoinked_account(self, account: str):
         r = requests.post(
             f'{self.ramuri}/SetDescription?Account={account}&Password={self.password}',
-            data="Primed"
-        )
+            data="Primed")
+        
