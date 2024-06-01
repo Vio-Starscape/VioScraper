@@ -70,7 +70,7 @@ vendor_id = [ 225, 120, 310, 320,]
         seen = set()
         result = []
         for item in data:
-            two = (item[0], item[1])
+            two = (item[1], item[2])
             if two not in seen:
                 seen.add(two)
                 result.append(item)

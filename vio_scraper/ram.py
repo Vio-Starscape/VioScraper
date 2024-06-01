@@ -35,7 +35,7 @@ class RAM:
         self.update_there()
 
     def update_here(self):
-        r = requests.get(f'{self.uri}/api/scraper/getall',
+        r = requests.get(f'{self.uri}/api/scrapers/getall',
                          headers={"x-api-key": self.apikey})
         response_data = r.json()
 
@@ -58,7 +58,7 @@ class RAM:
                 "yoinked": "yoinked" in description
             })
         r = requests.post(
-            f'{self.uri}/api/scraper/sync',
+            f'{self.uri}/api/scrapers/sync',
             headers={"x-api-key": self.apikey},
             json=account_data
         )
@@ -131,7 +131,7 @@ class RAM:
             r = requests.get(f'{self.ramuri}/LaunchAccount?Account={account}&PlaceId=679715583&Password={self.password}', timeout=1)
         except requests.exceptions.ReadTimeout:
             pass
-        r = requests.post(f'{self.uri}/api/scraper/update/active',
+        r = requests.post(f'{self.uri}/api/scrapers/update/active',
                          headers={"x-api-key": self.apikey},
                          json={"name": account, "active": True, "yoinked": False})
         
@@ -150,7 +150,7 @@ class RAM:
             f'{self.ramuri}/SetDescription?Account={account}&Password={self.password}',
             data="yoinked"
         )
-        r = requests.post(f'{self.uri}/api/scraper/update/yoinked',
+        r = requests.post(f'{self.uri}/api/scrapers/update/yoinked',
                          headers={"x-api-key": self.apikey},
                          json={"name": account, "active": False, "yoinked": True})
         hook = DiscordWebhooks(webhook_url=self.webhook_url)
