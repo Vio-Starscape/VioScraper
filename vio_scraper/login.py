@@ -13,6 +13,7 @@ class ProcessManager:
 
     def __enter__(self):
         self.subprocess = subprocess.Popen([self.find_roblox()])
+        time.sleep(10)
         while self.login_sequence():
             pass
         return self
