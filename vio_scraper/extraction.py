@@ -74,15 +74,6 @@ vendor_id = [ 225, 120, 310, 320,]
             if two not in seen:
                 seen.add(two)
                 result.append(item)
-            else:
-                try:
-                    # Image.fromarray(img).save(f"DupImg{uuid.uuid4()}.png")
-                    pass
-                except:
-                    pass
-                print(data)
-                print("Duplicate found: ", item)
-        print(result)
         return result
 
     def get_buy(self, img: Image.Image, buys: bool = False, sells: bool = False):
