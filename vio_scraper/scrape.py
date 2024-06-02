@@ -99,52 +99,55 @@ class ItemScraper:
                 images = []
 
     def new_complete_scrape(self, location: str = "c1"):
-        current_iter = {
-            "location": location,
-            "time_scanned": datetime.now(timezone.utc),
-            "items": {}
-        }
-        pydirectinput.press("\\")
-        pydirectinput.press("down")
-        pydirectinput.press("down")
-        pydirectinput.press("down")
-
-        # for _ in range(5):
-        #     pydirectinput.press("left")
-        cpus = multiprocessing.cpu_count()
-        queue = Queue()
-        with ProcessPoolExecutor(max_workers=cpus) as executor:
-            grabber = Thread(target=self.grab_images, args=(queue, self.config))
-            processor = Thread(target=self.process_images, args=(queue, executor, current_iter, cpus))
-            grabber.start()
-            processor.start()
-            grabber.join()
-            queue.put(None)  # signal to processor that grabbing is done
-            processor.join()
-        # self.click_at_location_name("open_item")
-        pydirectinput.press("\\")
-        self.click_at_location_name("first_row")
-        self.click_at_location_name("Armor")
-        time.sleep(0.5)
-        self.click_at_location_name("All")
-        time.sleep(0.5)
-        self.click_at_location_name("Resources")
-        time.sleep(0.5)
-        self.click_at_location_name("All")
-
-        for _ in range(5):
-            time.sleep(0.1)
+        try:
+            current_iter = {
+                "location": location,
+                "time_scanned": datetime.now(timezone.utc),
+                "items": {}
+            }
             pydirectinput.press("\\")
-            # time.sleep(0.1)
-            # self.click_at_location_name("terminal_x")
-            # time.sleep(0.1)
-            # pydirectinput.press("f")
-            time.sleep(0.1)
+            pydirectinput.press("down")
+            pydirectinput.press("down")
+            pydirectinput.press("down")
+
+            # for _ in range(5):
+            #     pydirectinput.press("left")
+            cpus = multiprocessing.cpu_count()
+            queue = Queue()
+            with ProcessPoolExecutor(max_workers=cpus) as executor:
+                grabber = Thread(target=self.grab_images, args=(queue, self.config))
+                processor = Thread(target=self.process_images, args=(queue, executor, current_iter, cpus))
+                grabber.start()
+                processor.start()
+                grabber.join()
+                queue.put(None)  # signal to processor that grabbing is done
+                processor.join()
+            # self.click_at_location_name("open_item")
             pydirectinput.press("\\")
-            time.sleep(0.1)
-        if len(current_iter["items"]) < 100:
-            raise ItemNotFound("No items found")
-        return current_iter
+            self.click_at_location_name("first_row")
+            self.click_at_location_name("Armor")
+            time.sleep(0.5)
+            self.click_at_location_name("All")
+            time.sleep(0.5)
+            self.click_at_location_name("Resources")
+            time.sleep(0.5)
+            self.click_at_location_name("All")
+
+            for _ in range(5):
+                time.sleep(0.1)
+                pydirectinput.press("\\")
+                # time.sleep(0.1)
+                # self.click_at_location_name("terminal_x")
+                # time.sleep(0.1)
+                # pydirectinput.press("f")
+                time.sleep(0.1)
+                pydirectinput.press("\\")
+                time.sleep(0.1)
+            if len(current_iter["items"]) < 100:
+                raise ItemNotFound("No items found")
+            return current_iter
+        except KeyboardInterrupt:
+            sys.exit(0)
 
     def closeItem(self):
         self.click_at_location_name("close_item")

@@ -1,85 +1,9 @@
+import time
 import os
 import logging
-import time
-import datetime
-import toml
-import requests
-import keyboard
-import json
 import threading
 import customtkinter as ctk
 import tkinter.scrolledtext as tkst
-from dotenv import load_dotenv
-from vio_scraper import ItemScraper, ItemNotFound, RAM
-
-load_dotenv(override=True)
-
-logger = logging.getLogger("LucaScraper")
-
-def datetime_handler(x):
-    if isinstance(x, datetime.datetime):
-        return x.isoformat()
-    raise TypeError("Unknown type")
-
-def add_scan_to_database(items: dict):
-    try:
-        print("Adding to database")
-        if len(items["items"]) < 100:
-            return
-        res = requests.post(
-            os.getenv("URL"),
-            headers={"x-api-key": os.getenv("VIO_API_KEY")},
-            json=json.loads(json.dumps(items, default=datetime_handler)),
-            timeout=50
-        )
-        if res.status_code != 200:
-            logger.error(f"Failed to add scan to database!")
-            logger.error("Check if the server is running and the API key is correct!")
-    except Exception as e:
-        logger.error(e)
-
-def main(config: dict):
-    memory = {}
-    broken = False
-    while not broken:
-        try:
-            with RAM(
-                    os.getenv("DISCORD_WEBHOOK_URI"),
-                    os.getenv("RAM_PASSWORD"),
-                    os.getenv("RAM_URL"),
-                    os.getenv("SCRAPER_URL"),
-                    os.getenv("VIO_API_KEY"),
-                    config) as process:
-                starscraper = ItemScraper(config)
-                while not broken:
-                    try:
-                        start = time.perf_counter()
-                        resp = starscraper.new_complete_scrape()
-                        add_scan_to_database(resp)
-                        end = time.perf_counter()
-                        memory[process.current_account] = 0
-                        print("Time taken: ", end - start)
-                    except KeyboardInterrupt:
-                        broken = True
-                        break
-                    except ItemNotFound as e:
-                        logger.warning("Item not found!, Adding Strike to account.")
-                        if process.current_account not in memory:
-                            memory[process.current_account] = 1
-                        else:
-                            memory[process.current_account] += 1
-                        if memory[process.current_account] >= 4:
-                            process.mark_account_as_yoinked(process.current_account)
-                        break
-                    if keyboard.is_pressed("q"):
-                        broken = True
-                        break
-            if broken:
-                break
-        except KeyboardInterrupt:
-            break
-        except Exception as e:
-            logger.error(e)
 
 class TextHandler(logging.Handler):
     # This class allows you to log to a Tkinter Text or ScrolledText widget
