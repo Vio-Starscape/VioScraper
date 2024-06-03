@@ -1,13 +1,9 @@
 import toml
-import os
 import cv2
 import regex
 import pytesseract
 from PIL import Image
 import numpy as np
-
-if os.name == "nt":
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 class ImageProcessing:
     def __init__(self):
@@ -26,6 +22,8 @@ vendor_id = [ 225, 120, 310, 320,]
 """)
         self.extra_buy = 195
         self.extra_sell = 197
+
+        pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
     def extract_data_from_image(self, img: Image, buys: bool = False, sells: bool = False):
         data = {

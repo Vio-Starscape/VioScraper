@@ -4,6 +4,7 @@ import pygetwindow
 from PIL import ImageGrab
 import pydirectinput
 import time
+import logging
 from discord_webhooks import DiscordWebhooks
 
 class RAM:
@@ -17,15 +18,11 @@ class RAM:
 
         self.current_account: dict | None = None
 
-    def __enter__(self):
-        if "Roblox Account Manager.exe" not in [proc.name() for proc in psutil.process_iter()]:
-            print("Launching Roblox Account Manager")
-            psutil.Popen([r"C:\Users\ericm\Desktop\Roblox Account Manager\Roblox Account Manager.exe"])
-            time.sleep(10)
+        self.logger = logging.getLogger(__name__)
 
-        print("Updating here...")
+    def __enter__(self):
+        self.logger.info("Updating accounts...")
         self.update_there()
-        self.update_here()
         while self.login_sequence():
             pass
         return self
@@ -47,7 +44,7 @@ class RAM:
             elif current_accounts[account["name"]] != "yoinked" and account["yoinked"]:
                 self.mark_account_as_yoinked(account["name"])
         
-        print("Update Done!")
+        self.logger.info("Update Done!")
     
     def update_there(self):
         account_data = []
@@ -76,7 +73,7 @@ class RAM:
         self.current_account = accounts[0]
         self.launch_account()
 
-        print("Using account: ", self.current_account)
+        self.logger.info(f"Using account: {self.current_account}")
 
         def wait_for(func, *args, func2 = None):
             initial = time.perf_counter()
@@ -92,7 +89,6 @@ class RAM:
             func2=self.bring_to_front
         ):
             return False
-        print("Found logo")
         pydirectinput.moveTo(*self.config["starscape_button"])
         pydirectinput.click()
         self.jiggle_mouse()
