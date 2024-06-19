@@ -74,6 +74,8 @@ def scrape_func(
                         add_scan_to_database(resp, api_url, api_key)
                         end = time.perf_counter()
                         memory[process.current_account] = 0
+                        if end-start < 10:
+                            raise Exception("Scrape took less than 10 seconds! Restarting...")
                         print("Time taken: ", end - start)
                     except ItemNotFound as e:
                         logger.warning("Item not found!, Adding Strike to account.")
@@ -234,7 +236,7 @@ class myGUI(ctk.CTk):
         self.DISCORD_WEBHOOK.place(relx=0.25, rely=0.4, relwidth=0.25, anchor='center')
 
         self.BUY_TAB = ctk.CTkCheckBox(self.settings_tab, text="Buy Tab")
-        if settings.get('BUY_TAB', False):
+        if bool(settings.get('BUY_TAB', False)):
             self.BUY_TAB.select()
         else:
             self.BUY_TAB.deselect()
@@ -336,7 +338,8 @@ class myGUI(ctk.CTk):
                         "RAM_PASSWORD": self.RAM_PASSWORD.get(),
                         "API_URL": self.API_URL.get(),
                         "SCRAPER_URL": self.SCRAPER_URL.get(),
-                        "VIO_API_KEY": self.VIO_API_KEY.get()
+                        "VIO_API_KEY": self.VIO_API_KEY.get(),
+                        "BUY_TAB": self.BUY_TAB.get()
                     },
                     f
                 )
