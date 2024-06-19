@@ -362,7 +362,7 @@ class myGUI(ctk.CTk):
                 self.SCRAPER_URL.get(),
                 self.VIO_API_KEY.get(),
                 self.API_URL.get(),
-                self.BUY_TAB.getboolean()
+                bool(self.BUY_TAB.get())
                 )
             )
         self.scrape_thread.daemon = True

@@ -1,5 +1,6 @@
 import requests
 import psutil
+import socket
 import pygetwindow
 from PIL import ImageGrab
 import pydirectinput
@@ -33,6 +34,7 @@ class RAM:
 
     def update_here(self):
         r = requests.get(f'{self.uri}/api/scrapers/getall',
+                         params={"host": socket.gethostname()},
                          headers={"x-api-key": self.apikey})
         response_data = r.json()
 
@@ -56,6 +58,7 @@ class RAM:
             })
         r = requests.post(
             f'{self.uri}/api/scrapers/sync',
+            params={"host": socket.gethostname()},
             headers={"x-api-key": self.apikey},
             json=account_data
         )
@@ -80,7 +83,7 @@ class RAM:
             while not func(*args):
                 if func2:
                     func2()
-                if time.perf_counter() - initial > 20:
+                if time.perf_counter() - initial > 40:
                     return False
             return True
         if not wait_for(
@@ -128,6 +131,7 @@ class RAM:
         except requests.exceptions.ReadTimeout:
             pass
         r = requests.post(f'{self.uri}/api/scrapers/update/active',
+                         params={"host": socket.gethostname()},
                          headers={"x-api-key": self.apikey},
                          json={"name": account, "active": True, "yoinked": False})
         
@@ -147,6 +151,7 @@ class RAM:
             data="yoinked"
         )
         r = requests.post(f'{self.uri}/api/scrapers/update/yoinked',
+                          params={"host": socket.gethostname()},
                          headers={"x-api-key": self.apikey},
                          json={"name": account, "active": False, "yoinked": True})
         hook = DiscordWebhooks(webhook_url=self.webhook_url)

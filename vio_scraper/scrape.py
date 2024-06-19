@@ -22,6 +22,7 @@ def unknown_worker(data):
     img = ImageProcessing()
     try:
         info = img.extract_data_from_image(data["image"], data["extra_buy"], data["extra_sell"])
+        info["time_scanned"] = data["time_scanned"]
         return {
             "name": info["name"],
             "data": info
@@ -36,10 +37,10 @@ class ItemScraper:
     table_scale = 2 # Upscale for orders
     row_height = 37
 
-    def __init__(self, config: dict, buy_path: bool) -> None:
+    def __init__(self, config: dict, buy_tab: bool) -> None:
         self.config = config
         self.processor = ImageProcessing()
-        self.buy_path = buy_path
+        self.buy_tab = buy_tab
 
         self.stop_flag = False
         keyboard.on_press(self.on_press)
@@ -67,6 +68,7 @@ class ItemScraper:
             queue.put(
                 {
                     "name": "unknown",
+                    "time_scanned": datetime.now(timezone.utc),
                     "extra_sell": extra_sells,
                     "extra_buy": extra_buys,
                     "image" : img
@@ -100,11 +102,7 @@ class ItemScraper:
                     if result["name"] not in current_iter["items"]:
                         current_iter["items"][result["name"]] = result["data"]
                     else:
-                        # current_iter["items"][result["name"]]["buy"].extend(result["data"]["buy"])
-                        # current_iter["items"][result["name"]]["buy"] = list(set(current_iter["items"][result["name"]]["buy"]))
                         current_iter["items"][result["name"]]["buy"] = result["data"]["buy"]
-                        # current_iter["items"][result["name"]]["sell"].extend(result["data"]["sell"])
-                        # current_iter["items"][result["name"]]["sell"] = list(set(current_iter["items"][result["name"]]["sell"]))
                         current_iter["items"][result["name"]]["sell"] = result["data"]["sell"]
                 images = []
 
@@ -115,6 +113,10 @@ class ItemScraper:
             "time_scanned": datetime.now(timezone.utc),
             "items": {}
         }
+        
+        if self.buy_tab:
+            self.click_at_location_name("switch_to_buy")
+
         pydirectinput.press("\\")
         pydirectinput.press("down")
         pydirectinput.press("down")

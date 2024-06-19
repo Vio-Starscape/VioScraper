@@ -3,6 +3,7 @@ import cv2
 import regex
 import pytesseract
 from PIL import Image
+from datetime import datetime, timezone
 import numpy as np
 
 class ImageProcessing:
@@ -28,6 +29,7 @@ vendor_id = [ 225, 120, 310, 320,]
     def extract_data_from_image(self, img: Image, buys: bool = False, sells: bool = False):
         data = {
             "name": self.get_title(img),
+            "time_scanned": datetime.now(timezone.utc),
             "buy": self.get_buy(img, buys, sells),
             "sell": self.get_sell(img, sells),
         }
