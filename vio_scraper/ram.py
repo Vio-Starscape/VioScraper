@@ -83,7 +83,7 @@ class RAM:
             while not func(*args):
                 if func2:
                     func2()
-                if time.perf_counter() - initial > 20:
+                if time.perf_counter() - initial > 40:
                     return False
             return True
         if not wait_for(
