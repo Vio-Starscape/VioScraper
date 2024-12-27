@@ -1,5 +1,6 @@
 import requests
 import psutil
+import socket
 import pygetwindow
 from PIL import ImageGrab
 import pydirectinput
@@ -36,7 +37,9 @@ class RAM:
 
     def update_here(self):
         r = requests.get(f'{self.uri}/api/scrapers/getall',
+                         params={"host":socket.gethostname()},
                          headers={"x-api-key": self.apikey})
+        print(self.uri, r.headers, r.status_code)
         response_data = r.json()
 
         current_accounts = self.get_accounts_json()
@@ -59,6 +62,7 @@ class RAM:
             })
         r = requests.post(
             f'{self.uri}/api/scrapers/sync',
+            params={"host":socket.gethostname()},
             headers={"x-api-key": self.apikey},
             json=account_data
         )
