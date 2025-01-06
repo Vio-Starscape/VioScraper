@@ -137,6 +137,7 @@ class RAM:
             pass
         r = requests.post(f'{self.uri}/api/scrapers/update/active',
                          headers={"x-api-key": self.apikey},
+                         params={"host":socket.gethostname()},
                          json={"name": account, "active": True, "yoinked": False})
         
     def bring_to_front(self):
@@ -156,6 +157,7 @@ class RAM:
         )
         r = requests.post(f'{self.uri}/api/scrapers/update/yoinked',
                          headers={"x-api-key": self.apikey},
+                         params={"host":socket.gethostname()},
                          json={"name": account, "active": False, "yoinked": True})
         hook = DiscordWebhooks(webhook_url=self.webhook_url)
         hook.set_content(title="Account Yoinked", description=f"Account {account} has been yoinked")
