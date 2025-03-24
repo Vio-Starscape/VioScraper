@@ -7,7 +7,7 @@ import requests
 import keyboard
 import json
 from dotenv import load_dotenv
-from vio_scraper import ProcessManager, ItemScraper, ItemNotFound, RAM
+from vio_scraper import ItemScraper, ItemNotFound, RAM
 
 load_dotenv(override=True)
 
