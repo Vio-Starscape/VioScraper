@@ -159,10 +159,11 @@ class RAM:
                          headers={"x-api-key": self.apikey},
                          params={"host":socket.gethostname()},
                          json={"name": account, "active": False, "yoinked": True})
-        hook = DiscordWebhooks(webhook_url=self.webhook_url)
-        hook.set_content(title="Account Yoinked", description=f"Account {account} has been yoinked")
-        hook.add_field(name="List of accounts", value="\n".join([f"{name}: {desc if desc else 'Good'}" for name, desc in self.get_accounts_json().items()]))
-        hook.send()
+        if account is not None:
+            hook = DiscordWebhooks(webhook_url=self.webhook_url)
+            hook.set_content(title="Account Yoinked", description=f"Account {account} has been yoinked")
+            hook.add_field(name="List of accounts", value="\n".join([f"{name}: {desc if desc else 'Good'}" for name, desc in self.get_accounts_json().items()]))
+            hook.send()
 
     def unmark_yoinked_account(self, account: str):
         r = requests.post(

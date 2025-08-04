@@ -29,22 +29,19 @@ def datetime_handler(x):
 def add_scan_to_database(items: dict):
     try:
         print("Adding to database")
-        cached.append(items)
-        bad = False
-        for item in cached:
-            if len(item["items"]) < 100:
-                continue
-            res = requests.post(
-                os.getenv("URL"),
-                headers={"x-api-key": os.getenv("VIO_API_KEY")},
-                json=json.loads(json.dumps(item, default=datetime_handler)),
-                timeout=50
-            )
-            if res.status_code != 200:
-                bad = True
-                print(res.text)
-        if not bad:
-            cached.clear()
+        if len(items["items"]) < 100:
+            print("Not enough items dumping scan")
+            return
+        res = requests.post(
+            os.getenv("URL"),
+            headers={"x-api-key": os.getenv("VIO_API_KEY")},
+            json=json.loads(json.dumps(items, default=datetime_handler)),
+            timeout=50
+        )
+        if res.status_code != 200:
+            bad = True
+            print("Getting Ratelimited")
+            print(res.text)
     except Exception as e:
         print(e)
 
@@ -75,6 +72,7 @@ def main(config: dict):
                     try:
                         start = time.perf_counter()
                         resp = starscraper.new_complete_scrape()
+                        print(resp)
                         add_scan_to_database(resp)
                         end = time.perf_counter()
                         memory[process.current_account] = 0
@@ -101,6 +99,17 @@ def main(config: dict):
         except Exception as e:
             print(e)
 
+def debug():
+    from PIL import ImageGrab
+    from pydirectinput import position
+
+    while True:
+        g = ImageGrab.grab()
+        p = position()
+        pix = g.getpixel(p)
+        print(p, pix)
+
+
 if __name__ == "__main__":
     with open("config1080p.toml", "r") as f:
         config = toml.load(f)
@@ -108,3 +117,4 @@ if __name__ == "__main__":
     main(config)
     # time.sleep(5)
     # test_function(config)
+    

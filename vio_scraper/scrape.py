@@ -7,7 +7,7 @@ import keyboard
 import multiprocessing
 import sys
 from queue import Queue
-from threading import Thread
+from threading import Thread, Event
 from concurrent.futures import ProcessPoolExecutor
 from PIL import ImageGrab, Image
 from .extraction import ImageProcessing
@@ -41,10 +41,11 @@ class ItemScraper:
         self.model_path = model_path
         self.processor = ImageProcessing()
 
-    def grab_images(self, queue, config):
+    def grab_images(self, queue, config, stop_event):
         time.sleep(1)
         grab = ImageGrab.grab()
-        while (not keyboard.is_pressed("q"))\
+        # Figure out this logic because it will not work long term
+        while (not keyboard.is_pressed("q")) and not stop_event.is_set()\
             and any([grab.getpixel((config["top_of_listing"][0], y)) == (255, 255, 255) for y in range(config["top_of_listing"][1], config["bottom_of_listing"][1]+20)]):
             time.sleep(0.1)
             pydirectinput.press("enter")
@@ -70,10 +71,12 @@ class ItemScraper:
             time.sleep(0.1)
             grab = ImageGrab.grab()
         if keyboard.is_pressed("q"):
-            sys.exit(0)
+            return
 
-    def process_images(self, queue, executor, current_iter, cpus=8):
+    def process_images(self, queue, executor, current_iter, stop_event, cpus=8):
         images = []
+        last_name = None
+        repeat_count = 0
         while True:
             data = queue.get()
             if data is None:  # sentinel value to indicate end of processing
@@ -86,6 +89,18 @@ class ItemScraper:
                         continue
                     if result["name"].endswith("tag"):
                         continue
+
+                    if result["name"] == last_name:
+                        repeat_count += 1
+                    else:
+                        last_name = result["name"]
+                        repeat_count = 1
+
+                    if repeat_count >= 20:
+                        logger.info("Detected 20 times stopping loop!")
+                        stop_event.set()
+                        return
+
                     result["name"] = result["name"].replace(".", "")
                     if result["name"] not in current_iter["items"]:
                         current_iter["items"][result["name"]] = result["data"]
@@ -105,17 +120,20 @@ class ItemScraper:
             "items": {}
         }
         pydirectinput.press("\\")
+        pydirectinput.press("right")
+        pydirectinput.press("left")
+        pydirectinput.press("left")
         pydirectinput.press("down")
-        pydirectinput.press("down")
-        pydirectinput.press("down")
-
         # for _ in range(5):
         #     pydirectinput.press("left")
         cpus = multiprocessing.cpu_count()
         queue = Queue()
+
+        stop_event = Event()
+
         with ProcessPoolExecutor(max_workers=cpus) as executor:
-            grabber = Thread(target=self.grab_images, args=(queue, self.config))
-            processor = Thread(target=self.process_images, args=(queue, executor, current_iter, cpus))
+            grabber = Thread(target=self.grab_images, args=(queue, self.config, stop_event))
+            processor = Thread(target=self.process_images, args=(queue, executor, current_iter, stop_event, cpus))
             grabber.start()
             processor.start()
             grabber.join()
